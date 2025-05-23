@@ -11,18 +11,22 @@ use super::{
     EndEffector,
     EndEffectorJoint,
     JointTransform,
+    SubBase,
     IkGlobalSettings
 };
 
 
 
 
-
+#[allow(clippy::type_complexity)]
+#[allow(clippy::too_many_arguments)]
 pub fn solve(
     base_q: Query<(&GlobalTransform, &Base)>,
     joint_q: Query<(Entity, &Joint)>,
     joint_parent_q: Query<&JointParent>,
     joint_children_q: Query<&JointChildren>,
+    ee_joint_q: Query<&EndEffectorJoint>,
+    //mut sub_base_q: Query<&mut SubBase>,
     mut transforms: ParamSet<(
         Query<(&mut Transform, &mut JointTransform, &GlobalTransform)>,
         TransformHelper,
@@ -45,7 +49,11 @@ pub fn solve(
         }
         let start_entity = joint_q.get(base.0).unwrap();
 
-        let end_points = forward_reach_setup(start_entity.0, joint_children_q);
+        //modify to provide a vec of sub bases (if there are any) so that we can apply
+        //an alternate version of the algorithm for out-of-reach-targets
+        let (end_points, sub_chains) = forward_reach_setup(start_entity.0, joint_children_q, joint_q);
+
+        check_reachable(end_points, sub_chains, base_gt.translation(), ee_joint_q, transforms.p0().as_readonly());
 
         for x in 0..settings.iterations {
             
@@ -61,8 +69,11 @@ pub fn solve(
 fn forward_reach_setup(
     start_joint: Entity,
     joint_children_q: Query<&JointChildren>,
-) -> Vec<Entity>{
-    let mut vec = vec![start_joint];
+    joint_q: Query<(Entity, &Joint)>,
+) -> (Vec<Entity>, Vec<(Entity, f32)>){
+    let mut end_points = vec![start_joint];
+    let start_length = joint_q.get(start_joint).unwrap().1.length;
+    let mut subchains = vec![(start_joint, start_length)];
     let mut active = vec![true];
     
     //this current count is the number of branches
@@ -77,31 +88,34 @@ fn forward_reach_setup(
             //check if the current joint has been exhausted or not
             if active[i] {
                 //check for children of the current entity
-                if let Ok(children) = joint_children_q.get(vec[i]){
+                if let Ok(children) = joint_children_q.get(end_points[i]){
                     //if there is a children component, then check if the ammount is more than 1
                     if children.0.len() > 1 {
                         //if the ammount is more than 1, then first increase the count based on the extra amount.
                         current_count += children.0.len() - 1;
+                        let new_length = joint_q.get(end_points[i]).unwrap().1.length;
+                        subchains.push((end_points[i], new_length));
                         //then replace the current entity with the first child
-                        vec[i] = children.0[0];
+                        end_points[i] = children.0[0];
                         //then loop through the rest and add them
-                        println!("multiple children detected!, adding these entities to the vec: {:#?}", children.0);
+                        //println!("multiple children detected!, adding these entities to the end_points: {:#?}", children.0);
                         
                         for c in 1..children.0.len(){
                             
-                            vec.push(children.0[c]);
+                            end_points.push(children.0[c]);
                             active.push(true);
                         }
                     } else{
                         //if it's just 1 child, then replace the current and move on.
-                        println!("found a child, replacing entity number {} with {}", vec[i], children.0[0]);
-                        vec[i] = children.0[0];
-                        
+                        //println!("found a child, replacing entity number {} with {}", end_points[i], children.0[0]);
+                        end_points[i] = children.0[0];
+                        let new_length = joint_q.get(end_points[i]).unwrap().1.length;
+                        subchains[i].1 += new_length;
                     }
                 }else{
                     //if this joint didn't have any children, then it's been exhausted, and shouldn't be changed.
                     //and skip it in future runs\
-                    println!("found the end of branch {}, removing", i);
+                    //println!("found the end of branch {}, removing", i);
                     active[i] = false; 
                     current_exhausted += 1;
                 }
@@ -112,7 +126,7 @@ fn forward_reach_setup(
         }
         //if all branches have been exhaused, then exit the loop.
         if current_exhausted == current_count {
-            println!("exiting the loop");
+            //println!("exiting the loop");
             exhausted = true;
         }
         //if they haven't all been exhausted, then redo everything again. repeat the process until the loop exits.
@@ -121,8 +135,43 @@ fn forward_reach_setup(
     }
 
     
-    println!("in the end, there was {} branch(es)", vec.len());
+    //println!("in the end, there was {} branch(es)", end_points.len());
 
 
-    vec
+    (end_points, subchains)
+}
+
+
+fn check_reachable(
+    end_points: Vec<Entity>,
+    sub_chains: Vec<(Entity, f32)>,
+    base_transform: Vec3,
+    ee_joint_q: Query<&EndEffectorJoint>,
+    transforms: Query<(&Transform, &JointTransform, &GlobalTransform)>,
+)-> bool{
+    let mut reaches = true;
+    if sub_chains.len() == 1 {
+        if let Ok(ee_joint) = ee_joint_q.get(end_points[0]){
+            if let Ok(ee_translation) = transforms.get(ee_joint.ee){
+                let distance = ee_translation.2.translation().distance(base_transform);
+                if distance > sub_chains[0].1 {
+                    reaches = false;
+                } 
+            }
+        }
+    }else{
+        for (i, entity) in end_points.iter().enumerate() {
+            if let Ok(ee_joint) = ee_joint_q.get(*entity){
+                let ee_translation = transforms.get(ee_joint.ee).unwrap().2.translation();
+                let sub_chain_translation = transforms.get(sub_chains[i].0).unwrap().2.translation();
+                let distance = ee_translation.distance(sub_chain_translation);
+                if distance > sub_chains[i].1 {
+                    reaches = false;
+                    break;
+                }   
+                
+            }
+        }
+    }
+    reaches
 }
