@@ -49,6 +49,7 @@ fn setup(
     commands.spawn((
         Joint{
             length: joint_length,
+            ..Default::default()
         },
         BaseJoint(base),
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
@@ -57,6 +58,7 @@ fn setup(
         children![(
             Joint{
                 length: joint_length,
+                ..Default::default()
             },
             Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
@@ -64,6 +66,7 @@ fn setup(
             children![(
                 Joint{
                     length: joint_length,
+                    ..Default::default()
                 },
                 Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                 MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
@@ -71,6 +74,7 @@ fn setup(
                 children![(
                     Joint{
                         length: joint_length,
+                        ..Default::default()
                     },
                     EndEffectorJoint{
                         ee: end_effector,
@@ -79,7 +83,22 @@ fn setup(
                     },
                     Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                    Transform::from_xyz(0.0, joint_length, 0.0),
+                    Transform::from_xyz(0.0, joint_length, 0.5 * joint_length),
+            
+                ),
+                (
+                    Joint{
+                        length: joint_length,
+                        ..Default::default()
+                    },
+                    EndEffectorJoint{
+                        ee: end_effector,
+                        joint_center: true,
+                        joint_copy_rotation: false,
+                    },
+                    Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
+                    MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+                    Transform::from_xyz(0.0, joint_length, -0.5 * joint_length),
             
                 )]
             )]

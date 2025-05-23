@@ -1,19 +1,19 @@
 use bevy::{
     ecs::{intern::Interned, schedule::ScheduleLabel},
     prelude::*,
+    math::Affine3A,
 };
 mod solver;
 
 pub struct IkSolverPlugin{
-    iterations: usize,
     schedule: Interned<dyn ScheduleLabel>,
 }
 
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
-        app.add_systems(self.schedule, (prepare_joints, solver::solve).chain())
-        .register_type::<(Joint, JointParent, JointChildren, Base, BaseJoint, EndEffector, EndEffectorJoint)>()
-        
+        app.add_systems(self.schedule, (prepare_joints, solver::solve).chain().before(TransformSystem::TransformPropagate))
+        .register_type::<(Joint, JointParent, JointChildren, Base, BaseJoint, EndEffector, EndEffectorJoint, JointTransform)>()
+        .insert_resource(IkGlobalSettings::default())
 
 ;
     }
@@ -22,7 +22,6 @@ impl Plugin for IkSolverPlugin{
 impl Default for IkSolverPlugin{
     fn default() -> Self {
         Self{
-            iterations: 10,
             schedule: PostUpdate.intern(),
         }
     }
@@ -32,17 +31,26 @@ impl IkSolverPlugin {
     /// Creates a [`IkSolverPlugin`] with the schedule that is used for running the `solve` function.
     ///
     /// The default schedule is `Last`. You may want to set this to be somewhere in `FixedUpdate` and use transform interpolation.
-    pub fn new(iters: usize, schedule: impl ScheduleLabel) -> Self {
+    pub fn new(schedule: impl ScheduleLabel) -> Self {
         Self {
-            iterations: iters,
             schedule: schedule.intern(),
         }
     }
 
-    /// Sets the global number of forward backward iterations done in the solver.
-    pub fn with_iterations(mut self, iters: usize) -> Self{
-        self.iterations = iters;
-        self
+}
+
+
+#[derive(Resource, Copy, Clone, Reflect, Debug)]
+#[reflect(Resource, Debug)]
+pub struct IkGlobalSettings{
+    pub iterations: usize,
+}
+
+impl Default for IkGlobalSettings{
+    fn default() -> Self {
+        Self{
+            iterations: 10
+        }
     }
 }
 
@@ -50,11 +58,38 @@ impl IkSolverPlugin {
 ///A `Joint` or bone in an IK chain.
 #[derive(Component, Clone, Copy, Default, Reflect, Debug)]
 #[reflect(Component, Debug)]
-#[require(Transform)]
+#[require(Transform, JointTransform)]
 pub struct Joint{
+    /// The Length of the `Joint`. Very important to the solver if you want a correct output.
     pub length: f32,
+
+    /// The `Joint` Offset. This Field can stay at zero if your bone is connected to the parent.
+    pub offset: Vec3,
 }
 
+/// Internal `Transform` specifically for [`Joint`]s, Contains an `Affine3A`
+/// which is used for:
+///
+/// - All the IK Math,
+/// - Keeping Track of Global [`Joint`] `Transform` during the solve system.
+/// - Easy Sync Back to Real `Transform`.
+#[derive(Component, Clone, Copy, Default, Reflect, Debug)]
+#[reflect(Component, Debug)]
+#[require(Transform)]
+pub struct JointTransform{
+    affine: Affine3A,        
+}
+
+
+/// Internal tag component used to denote a "sub-base", or a [`Joint`] with more
+/// than one child [`Joint`]. 
+///
+/// A [`Joint`] with more than one [`JointChildren`] that is found in the
+/// query without a `SubBase` during the prepare phase is given one. A `SubBase`
+/// in a [`Joint`] chain always indicates that the [`Joint`] chain has multiple
+/// [`EndEffector`]s, or branches.
+#[derive(Component)]
+pub struct SubBase;
 
 
 #[derive(Component, Debug, PartialEq, Eq, Reflect)]
