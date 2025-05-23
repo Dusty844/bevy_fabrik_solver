@@ -11,7 +11,11 @@ pub struct IkSolverPlugin{
 
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
-        app.add_systems(PostUpdate, solver::solve);
+        app.add_systems(self.schedule, (prepare_joints, solver::solve).chain())
+        .register_type::<(Joint, JointParent, JointChildren, Base, BaseJoint, EndEffector, EndEffectorJoint)>()
+        
+
+;
     }
 }
 
@@ -19,7 +23,7 @@ impl Default for IkSolverPlugin{
     fn default() -> Self {
         Self{
             iterations: 10,
-            schedule: Last.intern(),
+            schedule: PostUpdate.intern(),
         }
     }
 }
@@ -110,7 +114,18 @@ pub struct EndEffector{
 #[derive(Component, Clone, Copy, Reflect, Debug)]
 #[reflect(Component, Debug)]
 #[require(Transform)]
-pub struct EndEffectorJoint(Entity);
+pub struct EndEffectorJoint{
+    /// The targeted [`EndEffector`]
+    pub ee: Entity,
+    /// If set to true, then the target [`Joint`] will be positioned in the center of
+    /// the [`EndEffector`], relative to the length of the [`Joint`].
+    pub joint_center: bool,
+    /// If set to true, then the target [`Joint`] will try to copy the rotation of the
+    /// [`EndEffector`]
+    pub joint_copy_rotation: bool,
+    
+    
+}
 
 
 
@@ -123,6 +138,14 @@ pub struct EndEffectorJoint(Entity);
 /// top of the hierarchy) is algorithmically constrained to.
 ///
 /// The Entity field in the [`Base`] Component points to the root joint.
+///
+/// Depending on how you choose to spawn entities, you can place this component
+/// on the root [`Joint`] and set the [`Base`].
+/// 
+/// Alternatively you can do the opposite and set the root [`Joint`] from the
+/// [`Base`] component.
+///
+/// Either way, both sides should sync together prior to the solver.
 /// 
 /// A `Base` Component should not point to any [`Joint`] that has a
 /// [`JointParent`]. or else, the entity field in the `Base` component will be
@@ -133,20 +156,81 @@ pub struct EndEffectorJoint(Entity);
 #[derive(Component, Clone, Copy, Reflect, Debug)]
 #[reflect(Component, Debug)]
 #[require(Transform)]
-pub struct Base(Entity);
+pub struct Base(pub Entity);
 
 
 
 
 
 
-/// The `BaseJoint` component is automatically placed on the target
-/// [`Joint`] of a [`Base`], this is for the algorithm only, and
-/// shouldn't matter to the End User.
+/// The `BaseJoint` component is placed on the target [`Joint`] of a [`Base`].
+/// 
+/// Depending on how you choose to spawn entities, you can place this component
+/// on the root [`Joint`] and set the [`Base`].
+/// 
+/// Alternatively you can do the opposite and set the root [`Joint`] from the
+/// [`Base`] component.
+///
+/// Either way, both sides should sync together prior to the solver.
+///
+/// In The Future, the `Base` and [`BaseJoint`] components will
+/// be connected with a One-To-One RelationshipTarget.
 #[derive(Component, Clone, Copy, Reflect, Debug)]
 #[reflect(Component, Debug)]
 #[require(Transform)]
-pub struct BaseJoint(Entity);
+pub struct BaseJoint(pub Entity);
 
+
+/// Puts JointParent on joints that have parent joint, maybe do this 
+/// with component hooks instead? i'm not quite sure at the moment.
+#[allow(clippy::type_complexity)]
+fn prepare_joints(
+    new_joints: Query<(Entity, &ChildOf), Added<Joint>>,
+    joint_q: Query<&Joint>,
+    base_j_q: Query<(Entity, &BaseJoint), Or<(Added<BaseJoint>, Changed<BaseJoint>)>>,
+    base_q: Query<(Entity, &Base), Or<(Added<Base>, Changed<Base>)>>,
+    ee_j_q: Query<(Entity, &EndEffectorJoint), Or<(Added<EndEffectorJoint>, Changed<EndEffectorJoint>)>>,
+    ee_q: Query<(Entity, &EndEffector), Or<(Added<EndEffector>, Changed<EndEffector>)>>,
+    mut commands: Commands,
+){
+    for (entity, parent) in new_joints.iter(){
+        if joint_q.get(parent.0).is_ok(){
+            commands.entity(entity).try_insert_if_new(JointParent(parent.0));
+        }
+    }
+
+    //sync base from base joint end
+    for (entity, base_j) in base_j_q.iter(){
+        commands.entity(base_j.0).try_insert_if_new(Base(entity));
+    }
+
+    
+    //sync base joint from base end
+    for (entity, base) in base_q.iter(){
+        commands.entity(base.0).try_insert_if_new(BaseJoint(entity));
+    }
+
+    //sync ee from ee joint end
+    for (entity, ee_j) in ee_j_q.iter(){
+        commands.entity(ee_j.ee).try_insert(EndEffector{
+            joint: entity,
+            joint_center: ee_j.joint_center,
+            joint_copy_rotation: ee_j.joint_copy_rotation
+        });
+    }
+
+    
+    //sync ee joint from base end
+    for (entity, ee) in ee_q.iter(){
+        commands.entity(ee.joint).try_insert(EndEffectorJoint{
+            ee: entity,
+            joint_center: ee.joint_center,
+            joint_copy_rotation: ee.joint_copy_rotation
+        });
+    }
+    
+    
+    
+}
 
 

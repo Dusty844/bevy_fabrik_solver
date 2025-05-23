@@ -1,10 +1,14 @@
 use bevy::prelude::*;
 use bevy_fabrik_solver::*;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_egui::EguiPlugin;
 
 fn main(){
     App::new()
         .add_plugins((DefaultPlugins, IkSolverPlugin::default()))
         .add_systems(Startup, setup)
+        .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
+        .add_plugins(WorldInspectorPlugin::new())
         .run();
 }
 
@@ -30,12 +34,23 @@ fn setup(
 
     let joint_length = 0.5;
 
+    let base = commands.spawn((
+        Transform::IDENTITY,
+        Name::new("Base"),
+    )).id();
+
+    let end_effector = commands.spawn((
+        Transform::from_xyz(0.15, 3.5, 0.2),
+        Name::new("End Effector"),
+        
+    )).id();
     
 
     commands.spawn((
         Joint{
             length: joint_length,
         },
+        BaseJoint(base),
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.0, 0.0),
@@ -56,6 +71,11 @@ fn setup(
                 children![(
                     Joint{
                         length: joint_length,
+                    },
+                    EndEffectorJoint{
+                        ee: end_effector,
+                        joint_center: true,
+                        joint_copy_rotation: false,
                     },
                     Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
