@@ -39,10 +39,19 @@ fn setup(
         Name::new("Base"),
     )).id();
 
-    let end_effector = commands.spawn((
+    let end_effector1 = commands.spawn((
         Transform::from_xyz(0.15, 3.5, 0.2),
-        Name::new("End Effector"),
+        Name::new("End Effector 1"),
+        Mesh3d(meshes.add(Sphere::new(joint_length * 0.1))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(200, 20, 25))),
         
+    )).id();
+
+    let end_effector2 = commands.spawn((
+        Transform::from_xyz(0.15, 3.5, 0.2),
+        Name::new("End Effector 2"),
+        Mesh3d(meshes.add(Sphere::new(joint_length * 0.1))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(200, 20, 25))),
     )).id();
     
 
@@ -77,7 +86,7 @@ fn setup(
                         ..Default::default()
                     },
                     EndEffectorJoint{
-                        ee: end_effector,
+                        ee: end_effector1,
                         joint_center: true,
                         joint_copy_rotation: false,
                     },
@@ -92,7 +101,7 @@ fn setup(
                         ..Default::default()
                     },
                     EndEffectorJoint{
-                        ee: end_effector,
+                        ee: end_effector2,
                         joint_center: true,
                         joint_copy_rotation: false,
                     },

@@ -251,14 +251,7 @@ fn prepare_joints(
         commands.entity(base.0).try_insert_if_new(BaseJoint(entity));
     }
 
-    //sync ee from ee joint end
-    for (entity, ee_j) in ee_j_q.iter(){
-        commands.entity(ee_j.ee).try_insert(EndEffector{
-            joint: entity,
-            joint_center: ee_j.joint_center,
-            joint_copy_rotation: ee_j.joint_copy_rotation
-        });
-    }
+    
 
     
     //sync ee joint from base end
@@ -270,7 +263,32 @@ fn prepare_joints(
         });
     }
     
-    
+    //sync ee from ee joint end
+    for (entity, ee_j) in ee_j_q.iter(){
+        if let Ok(ee) = ee_q.get(ee_j.ee){
+            if ee.1.joint != entity {
+                //this is maybe not a good idea.
+
+                warn!("tried setting more than one end effector joint to just one End Effector, creating a new End Effector.");
+                commands.spawn((
+                    EndEffector{
+                        joint: entity,
+                        joint_center: ee_j.joint_center,
+                        joint_copy_rotation: ee_j.joint_copy_rotation
+                    },
+                    
+                    //ChildOf(entity),
+            ));
+            }
+        }else{
+            commands.entity(ee_j.ee).try_insert_if_new(EndEffector{
+                joint: entity,
+                joint_center: ee_j.joint_center,
+                joint_copy_rotation: ee_j.joint_copy_rotation
+            });
+        }
+        
+    }
     
 }
 

@@ -1,3 +1,4 @@
+use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::prelude::*;
 
 use std::sync::{Arc, Mutex};
@@ -29,14 +30,14 @@ pub fn solve(
     joint_children_q: Query<&JointChildren>,
     ee_joint_q: Query<&EndEffectorJoint>,
     //mut sub_base_q: Query<&mut SubBase>,
-    mut joint_transforms: Query<(Entity, &mut JointTransform)>,
+    mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
     mut transforms: ParamSet<(
         Query<(&mut Transform, &GlobalTransform)>,
         TransformHelper,
     )>,
     settings: Res<IkGlobalSettings>,
 ){
-    for (entity, mut joint_t) in joint_transforms.iter_mut(){
+    for (entity, mut joint_t, _) in joint_transforms.iter_mut(){
         let gt = transforms.p1().compute_global_transform(entity).unwrap();
         joint_t.affine = gt.affine();
     }  
@@ -70,7 +71,7 @@ pub fn solve(
 
         if ignore_chains.len() == sub_chain_length {
             //apply full optimization
-            reach_out_full(joint_transforms.reborrow(), start_entity, joint_children_q, base_translation, ignore_chains);
+            reach_out_full(joint_transforms.reborrow(), joint_q, start_entity, joint_children_q, base_translation, ignore_chains);
             
         } else{
             
@@ -79,6 +80,46 @@ pub fn solve(
             }
         }
 
+        let mut i = 0;
+        //reset positions
+        let mut current = vec![start_entity.0];
+        while !current.is_empty() {
+            
+            while i < current.len(){
+                let (_, current_jt, parent_maybe) = joint_transforms.get(current[i]).unwrap();
+                if let Some(parent) = parent_maybe{
+                    //current has a parent.
+                    let new_gt = transforms.p1().compute_global_transform(parent.0).unwrap();
+                    //normally i'd inverse, but should i for this setup? trying something new.
+                    let new_affine = new_gt.affine().inverse();
+                    let final_affine = new_affine * current_jt.affine;
+                    let srt = final_affine.to_scale_rotation_translation();
+                    let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+                    *transforms.p0().get_mut(current[i]).unwrap().0 = new_transform;
+                    
+                } else{
+
+                    let srt = current_jt.affine.to_scale_rotation_translation();
+                    let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+                    *transforms.p0().get_mut(current[i]).unwrap().0 = new_transform;
+                }
+                if let Ok(joint_children) = joint_children_q.get(current[i]){
+                    current[i] = joint_children.0[0];
+                    if joint_children.0.len() > 1 {
+                        for c in 1..joint_children.len(){
+                            current.add(joint_children.0[c]);
+                        }
+                    }
+                }else{
+                    current.remove(i);
+                }
+                
+                
+            }
+            i += 1;
+        }
+        
+        
         
         
 
@@ -118,9 +159,13 @@ fn forward_reach_setup(
                     if children.0.len() > 1 {
                         //if the ammount is more than 1, then first increase the count based on the extra amount.
                         current_count += children.0.len() - 1;
-                        let temp = end_points[i];
+                        //temp was used previously to set the sub chain root as the parent, but now that isn't necessary.
+                        //let temp = end_points[i];
                         //then replace the current entity with the first child
                         end_points[i] = children.0[0];
+
+                        let new_length = joint_q.get(end_points[i]).unwrap().1.length;
+                        subchains[i].1 += new_length;
                         //then loop through the rest and add them
                         //println!("multiple children detected!, adding these entities to the end_points: {:#?}", children.0);
                         
@@ -182,11 +227,11 @@ fn check_reachable(
     end_points: Vec<Entity>,
     sub_chains: Vec<(Entity, f32)>,
     ee_joint_q: Query<&EndEffectorJoint>,
-    mut joint_transforms: Query<(Entity, &mut JointTransform)>,
+    mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
 )-> Vec<(Entity, Entity, Entity)>{
     let mut ignore = vec![];
     for (i, entity) in end_points.iter().enumerate() {
-        if let Ok(ee_joint) = ee_joint_q.get(*entity){
+        if let Ok(ee_joint) = ee_joint_q.get(entity){
             let ee_translation = joint_transforms.get(ee_joint.ee).unwrap().1.affine.translation;
             let sub_chain_translation = joint_transforms.get(sub_chains[i].0).unwrap().1.affine.translation;
             let distance = ee_translation.distance(sub_chain_translation);
@@ -201,7 +246,8 @@ fn check_reachable(
 }
 
 fn reach_out_full(
-    mut joint_transforms: Query<(Entity, &mut JointTransform)>,
+    mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
+    joint_q: Query<(Entity, &Joint)>,
     start_entity: (Entity, &Joint),
     joint_children_q: Query<&JointChildren>,
     base_translation: Vec3,
@@ -216,6 +262,74 @@ fn reach_out_full(
     let main_dir = (first_ee_affine.translation - first_jt.1.affine.translation).normalize();
     let second_dir = first_jt.1.affine.local_z();
     first_jt.1.affine.align(Dir3::Y, Vec3::from(main_dir), Dir3::Z, second_dir);
+    // possibly include joint offset?
+    let first_base = first_jt.1.affine.translation + (first_jt.1.affine.local_y() * start_entity.1.length * 0.5);
+
     
+    //exit out early if root joint has no children for some reason, prevents panics from lack of children.
+    if joint_children_q.get(first_jt.0).is_err(){
+        return;
+    }
     
+    //set up the loop
+    let mut current = joint_children_q.get(first_jt.0).unwrap().0.clone();
+    let mut active = vec![true; current.len()];
+     
+    let mut bases = vec![first_base; current.len()];
+    
+    let mut current_count = current.len();
+    let mut i = 0;
+    let mut current_exhausted = 0;
+
+    let mut exhausted = false;
+
+    while !exhausted {
+        while i < current_count{
+            if active[i] {
+                let ee_entity = ignore_chains[i].2;
+                let ee_affine = joint_transforms.get(ee_entity).unwrap().1.affine;
+
+            
+                let (je, mut jt, _) = joint_transforms.get_mut(current[i]).unwrap();
+            
+                jt.affine.translation = bases[i];
+
+                let main_dir = (ee_affine.translation - jt.affine.translation).normalize();            
+                let second_dir = jt.affine.local_z();
+                jt.affine.align(Dir3::Y, Vec3::from(main_dir), Dir3::Z, second_dir);
+                let current_j = joint_q.get(current[i]).unwrap().1;
+                let local_up = jt.affine.local_y();
+                jt.affine.translation += local_up * current_j.length * 0.5;
+
+                let new_base = jt.affine.translation + (jt.affine.local_y() * current_j.length * 0.5);
+            
+                if let Ok(children) = joint_children_q.get(current[i]){
+                    current[i] = children.0[0];
+                    bases[i] = new_base;
+                    if children.0.len() > 1 {
+                        for c in 1..children.0.len() {
+                            if ignore_chains[i + 1].1 == children.0[c] {
+                                current.push(children.0[c]);
+                                bases.push(new_base);
+                                active.push(true);
+                                current_count += 1;
+                            }
+                        } 
+                    }
+                    
+                }else{
+                    current_exhausted += 1;
+                    active[i] = false;
+                }
+
+            }
+            i += 1;
+        }
+        if current_exhausted == current_count {
+            //println!("exiting the loop");
+            exhausted = true;
+        }
+        i = 0;
+    }
 }
+
