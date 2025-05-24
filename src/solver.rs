@@ -49,11 +49,21 @@ pub fn solve(
         }
         let start_entity = joint_q.get(base.0).unwrap();
 
-        //modify to provide a vec of sub bases (if there are any) so that we can apply
-        //an alternate version of the algorithm for out-of-reach-targets
+        //the sub chain [i] contains the start of a sub chain where endpoints [i] is the endpoint of said
+        //subchain, the first one always extends from the root to the first endpoint, and is the
+        //main chain. everything else extends from that.
+        // at the moment, the subchain is the parent entity, although it may be correct to make it the child instead.
         let (end_points, sub_chains) = forward_reach_setup(start_entity.0, joint_children_q, joint_q);
 
-        check_reachable(end_points, sub_chains, base_gt.translation(), ee_joint_q, transforms.p0().as_readonly());
+        let sub_chain_length = sub_chains.len();
+        
+        //first entity is the endpoint, second is the sub chain, third is the end effector
+        let ignore_chains = check_reachable(end_points, sub_chains, ee_joint_q, transforms.p0().as_readonly());
+
+        if ignore_chains.len() == sub_chain_length {
+            //apply full optimization
+
+        }
 
         for x in 0..settings.iterations {
             
@@ -93,15 +103,17 @@ fn forward_reach_setup(
                     if children.0.len() > 1 {
                         //if the ammount is more than 1, then first increase the count based on the extra amount.
                         current_count += children.0.len() - 1;
-                        let new_length = joint_q.get(end_points[i]).unwrap().1.length;
-                        subchains.push((end_points[i], new_length));
+                        let temp = end_points[i];
                         //then replace the current entity with the first child
                         end_points[i] = children.0[0];
                         //then loop through the rest and add them
                         //println!("multiple children detected!, adding these entities to the end_points: {:#?}", children.0);
                         
                         for c in 1..children.0.len(){
-                            
+                            let new_length = joint_q.get(temp).unwrap().1.length;
+                            //for each child, add a new subchain.
+                            //should the subchain start at the parent or the child?
+                            subchains.push((temp, new_length));
                             end_points.push(children.0[c]);
                             active.push(true);
                         }
@@ -145,33 +157,27 @@ fn forward_reach_setup(
 fn check_reachable(
     end_points: Vec<Entity>,
     sub_chains: Vec<(Entity, f32)>,
-    base_transform: Vec3,
     ee_joint_q: Query<&EndEffectorJoint>,
     transforms: Query<(&Transform, &JointTransform, &GlobalTransform)>,
-)-> bool{
-    let mut reaches = true;
-    if sub_chains.len() == 1 {
-        if let Ok(ee_joint) = ee_joint_q.get(end_points[0]){
-            if let Ok(ee_translation) = transforms.get(ee_joint.ee){
-                let distance = ee_translation.2.translation().distance(base_transform);
-                if distance > sub_chains[0].1 {
-                    reaches = false;
-                } 
-            }
-        }
-    }else{
-        for (i, entity) in end_points.iter().enumerate() {
-            if let Ok(ee_joint) = ee_joint_q.get(*entity){
-                let ee_translation = transforms.get(ee_joint.ee).unwrap().2.translation();
-                let sub_chain_translation = transforms.get(sub_chains[i].0).unwrap().2.translation();
-                let distance = ee_translation.distance(sub_chain_translation);
-                if distance > sub_chains[i].1 {
-                    reaches = false;
-                    break;
-                }   
+)-> Vec<(Entity, Entity, Entity)>{
+    let mut ignore = vec![];
+    for (i, entity) in end_points.iter().enumerate() {
+        if let Ok(ee_joint) = ee_joint_q.get(*entity){
+            let ee_translation = transforms.get(ee_joint.ee).unwrap().2.translation();
+            let sub_chain_translation = transforms.get(sub_chains[i].0).unwrap().2.translation();
+            let distance = ee_translation.distance(sub_chain_translation);
+            if distance > sub_chains[i].1 {
+                ignore.push((end_points[i], sub_chains[i].0, ee_joint.ee))
+            }   
                 
-            }
         }
     }
-    reaches
+    
+    ignore
+}
+
+fn reach_out_full(
+    
+){
+    
 }
