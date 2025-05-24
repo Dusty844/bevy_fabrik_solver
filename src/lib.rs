@@ -5,6 +5,8 @@ use bevy::{
 };
 mod solver;
 
+mod utils;
+
 pub struct IkSolverPlugin{
     schedule: Interned<dyn ScheduleLabel>,
 }
@@ -117,7 +119,7 @@ pub struct JointChildren(Vec<Entity>);
 /// be connected with a One-To-One RelationshipTarget.
 #[derive(Component, Clone, Copy, Reflect, Debug)]
 #[reflect(Component, Debug)]
-#[require(Transform)]
+#[require(Transform, JointTransform)]
 pub struct EndEffector{
     /// The [`Joint`] Entity of a [`Joint`] in a chain whose position will be set
     /// to, or as close to the end effector.
