@@ -71,12 +71,17 @@ pub fn solve(
 
         if ignore_chains.len() == sub_chain_length {
             //apply full optimization
-            reach_out_full(joint_transforms.reborrow(), joint_q, start_entity, joint_children_q, base_translation, ignore_chains);
+            reach_out_full(joint_transforms.reborrow(), joint_q, start_entity, joint_children_q, base_translation, ignore_chains.clone());
             
         } else{
+            //summed dist of the end joints to end effectors. if this value and the summed
+            // dist returned by the backward reach at the end of the iteration
+            // are the same, then break out of the loop. otherwise set the
+            // summed dist to returned dist at the end.
+            let mut summed_dist = 0.0;
             
             for x in 0..settings.iterations {
-            
+                forward_reach(joint_transforms.reborrow(), joint_q, start_entity, joint_children_q, joint_parent_q, ee_joint_q, ignore_chains.clone());
             }
         }
 
@@ -230,7 +235,7 @@ fn check_reachable(
     end_points: Vec<Entity>,
     sub_chains: Vec<(Entity, f32)>,
     ee_joint_q: Query<&EndEffectorJoint>,
-    mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
+    joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
 )-> Vec<(Entity, Entity, Entity)>{
     let mut ignore = vec![];
     for (i, entity) in end_points.iter().enumerate() {
@@ -346,6 +351,132 @@ fn reach_out_full(
         if current_exhausted == current_count {
             //println!("exiting the loop");
             exhausted = true;
+        }
+        i = 0;
+    }
+}
+
+
+fn forward_reach(
+    mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
+    joint_q: Query<(Entity, &Joint)>,
+    start_entity: (Entity, &Joint),
+    joint_children_q: Query<&JointChildren>,
+    joint_parent_q: Query<&JointParent>,
+    ee_joint_q: Query<&EndEffectorJoint>,
+    ignore_chains: Vec<(Entity, Entity, Entity)>,
+    
+){
+    let mut current: Vec<Entity> = ignore_chains.clone().iter().map(|t| t.0).collect();
+
+    let mut current_count = current.len();
+    let mut i = 0;
+    let mut exhausted = false;
+
+    
+    
+    while !exhausted{
+        while i < current_count {
+            if let Ok(joint) = joint_q.get(current[i]) {
+
+                
+
+                if let Ok(ee_joint) = ee_joint_q.get(current[i]){
+                    let ee_affine = joint_transforms.get(ee_joint.ee).unwrap().1.affine;
+                    //this has to be here for borrow checks.
+                    let (_, mut j_transform, _) = joint_transforms.get_mut(current[i]).unwrap();
+                    let j_main_dir = Dir3A::new_unchecked((ee_affine.translation - j_transform.affine.translation).normalize());
+                    let ee_main_dir = ee_affine.local_y();
+                    let second_dir = j_transform.affine.local_z();
+
+                    if ee_joint.joint_copy_rotation {
+                        j_transform.affine.align(Dir3A::Y, ee_main_dir, Dir3A::Z, second_dir);
+                    } else{
+                        j_transform.affine.align(Dir3A::Y, j_main_dir, Dir3A::Z, second_dir);
+                    }
+
+                    let new_up = j_transform.affine.local_y();
+                    
+                    //if there is an end effector to follow
+                    match (ee_joint.joint_center, joint.1.halfway) {
+                        (true, true) => {
+                            //is center, is half.
+                            j_transform.affine.translation = ee_affine.translation;
+                        }
+                        (false, false) => {
+                            //isn't center, isnt half
+                            j_transform.affine.translation = ee_affine.translation - (new_up * joint.1.length);
+                        }
+                        (true, false) => {
+                            //is center, isnt half
+                            j_transform.affine.translation = ee_affine.translation - (new_up * joint.1.length * 0.5);
+                        }
+                        (false, true) => {
+                            //isnt center is half
+                            j_transform.affine.translation = ee_affine.translation - (new_up * joint.1.length * 0.5);
+                        }
+                    }
+                
+                }
+                if let Ok(children) = joint_children_q.get(current[i]){
+                    if children.len() <= 1 {
+                        let mut child_affine = joint_transforms.get(children.0[0]).unwrap().1.affine;
+                        let child_joint = joint_q.get(children.0[0]).unwrap().1;
+                        if child_joint.halfway {
+                           child_affine.translation -= child_affine.local_y() * child_joint.length * 0.5; 
+                        }
+                        let (_, mut j_transform, _) = joint_transforms.get_mut(current[i]).unwrap();
+                        let main_dir = Dir3A::new_unchecked((child_affine.translation - j_transform.affine.translation).normalize());
+                        let second_dir = j_transform.affine.local_z();
+
+                        j_transform.affine.align(Dir3A::Y, main_dir, Dir3A::Z, second_dir);
+                        
+                        j_transform.affine.translation = child_affine.translation;
+                        
+                    }else{
+                        let mut average = Vec3A::ZERO;
+                        let mut d = 0.0;
+                        for c in 0..children.len() {
+                            let child_affine = joint_transforms.get(children.0[c]).unwrap().1.affine;
+                            let child_joint = joint_q.get(children.0[c]).unwrap().1;
+                            let next = if child_joint.halfway{
+                                child_affine.translation - (child_affine.local_y() * child_joint.length * 0.5)
+                            }else{
+                                child_affine.translation - (child_affine.local_y() * child_joint.length)
+                            };
+                            average += next;
+                            d += 1.0;
+                        }
+                        average /= d;
+                        
+
+                        let (_, mut j_transform, _) = joint_transforms.get_mut(current[i]).unwrap();
+                        let main_dir = Dir3A::new_unchecked((average - j_transform.affine.translation).normalize());
+                        let second_dir = j_transform.affine.local_z();
+
+                        j_transform.affine.align(Dir3A::Y, main_dir, Dir3A::Z, second_dir);
+                        
+                        j_transform.affine.translation = average;
+                    }
+                }
+                if let Ok(joint_parent) = joint_parent_q.get(current[i]) {
+                    if let Ok(joint_children) = joint_children_q.get(joint_parent.0){
+                        if current[i] == joint_children.0[0]{
+                            current[i] = joint_parent.0;
+                        }else{
+                            current.remove(i);
+                            i -= 1;
+                            current_count -= 1;
+                        }
+                    }
+                }
+
+                if current[i] == start_entity.0 {
+                    exhausted = true;
+                }
+            }
+            
+            i += 1;
         }
         i = 0;
     }
