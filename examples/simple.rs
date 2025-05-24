@@ -58,6 +58,7 @@ fn setup(
     commands.spawn((
         Joint{
             length: joint_length,
+            halfway: true,
             ..Default::default()
         },
         BaseJoint(base),
@@ -67,6 +68,7 @@ fn setup(
         children![(
             Joint{
                 length: joint_length,
+                halfway: true,
                 ..Default::default()
             },
             Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
@@ -75,6 +77,7 @@ fn setup(
             children![(
                 Joint{
                     length: joint_length,
+                    halfway: true,
                     ..Default::default()
                 },
                 Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
@@ -83,6 +86,7 @@ fn setup(
                 children![(
                     Joint{
                         length: joint_length,
+                        halfway: true,
                         ..Default::default()
                     },
                     EndEffectorJoint{
@@ -98,6 +102,7 @@ fn setup(
                 (
                     Joint{
                         length: joint_length,
+                        halfway: true,
                         ..Default::default()
                     },
                     EndEffectorJoint{

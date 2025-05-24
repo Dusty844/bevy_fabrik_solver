@@ -62,7 +62,7 @@ pub fn solve(
         //subchain, the first one always extends from the root to the first endpoint, and is the
         //main chain. everything else extends from that.
         // at the moment, the subchain is the parent entity, although it may be correct to make it the child instead.
-        let (end_points, sub_chains) = forward_reach_setup(start_entity.0, joint_children_q, joint_q, ee_joint_q);
+        let (end_points, sub_chains) = forward_reach_setup(start_entity, joint_children_q, joint_q, ee_joint_q);
 
         let sub_chain_length = sub_chains.len();
         
@@ -132,14 +132,17 @@ pub fn solve(
 
 
 fn forward_reach_setup(
-    start_joint: Entity,
+    start_joint: (Entity, &Joint),
     joint_children_q: Query<&JointChildren>,
     joint_q: Query<(Entity, &Joint)>,
     ee_joint_q: Query<&EndEffectorJoint>,
 ) -> (Vec<Entity>, Vec<(Entity, f32)>){
-    let mut end_points = vec![start_joint];
-    let start_length = joint_q.get(start_joint).unwrap().1.length;
-    let mut subchains = vec![(start_joint, start_length * 0.5)];
+    let mut end_points = vec![start_joint.0];
+    let mut start_length = joint_q.get(start_joint.0).unwrap().1.length;
+    if start_joint.1.halfway {
+        start_length *= 0.5;
+    }
+    let mut subchains = vec![(start_joint.0, start_length)];
     let mut active = vec![true];
     
     //this current count is the number of branches
@@ -262,8 +265,16 @@ fn reach_out_full(
     let main_dir = (first_ee_affine.translation - first_jt.1.affine.translation).normalize();
     let second_dir = first_jt.1.affine.local_z();
     first_jt.1.affine.align(Dir3::Y, Vec3::from(main_dir), Dir3::Z, second_dir);
+    let local_up = first_jt.1.affine.local_y();
     // possibly include joint offset?
-    let first_base = first_jt.1.affine.translation + (first_jt.1.affine.local_y() * start_entity.1.length * 0.5);
+    let first_length = if start_entity.1.halfway {
+        first_jt.1.affine.translation += local_up * start_entity.1.length * 0.5;
+        start_entity.1.length * 0.5
+    }else{
+        start_entity.1.length
+    };
+    
+    let first_base = first_jt.1.affine.translation + (first_jt.1.affine.local_y() * first_length);
 
     
     //exit out early if root joint has no children for some reason, prevents panics from lack of children.
@@ -299,9 +310,16 @@ fn reach_out_full(
                 jt.affine.align(Dir3::Y, Vec3::from(main_dir), Dir3::Z, second_dir);
                 let current_j = joint_q.get(current[i]).unwrap().1;
                 let local_up = jt.affine.local_y();
-                jt.affine.translation += local_up * current_j.length * 0.5;
+                let new_base = if current_j.halfway {
+                    jt.affine.translation += local_up * current_j.length * 0.5;
+                    
+                    jt.affine.translation + (jt.affine.local_y() * current_j.length * 0.5)
+                } else {
+                    jt.affine.translation + (jt.affine.local_y() * current_j.length)
+                };
+                
 
-                let new_base = jt.affine.translation + (jt.affine.local_y() * current_j.length * 0.5);
+                
             
                 if let Ok(children) = joint_children_q.get(current[i]){
                     current[i] = children.0[0];

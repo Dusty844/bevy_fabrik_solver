@@ -67,6 +67,11 @@ pub struct Joint{
 
     /// The `Joint` Offset. This Field can stay at zero if your bone is connected to the parent.
     pub offset: Vec3,
+
+    /// The halfway bool denotes whether a Zero local position is in the middle, or
+    /// half way up. If true, then the joint position shows the middle of the bone, if
+    /// false, then it shows the start of the bone.
+    pub halfway: bool,
 }
 
 /// Internal `Transform` specifically for [`Joint`]s, Contains an `Affine3A`
