@@ -28,13 +28,16 @@ pub fn solve(
     ee_joint_q: Query<&EndEffectorJoint>,
     //mut sub_base_q: Query<&mut SubBase>,
     mut transforms: ParamSet<(
-        Query<(&mut Transform, &mut JointTransform, &GlobalTransform)>,
+        Query<(&mut Transform, Option<&mut JointTransform>, &GlobalTransform)>,
         TransformHelper,
     )>,
     settings: Res<IkGlobalSettings>,
 ){
     for (t,mut joint_t, global_t) in transforms.p0().iter_mut(){
-        joint_t.affine = global_t.affine();
+        if let Some(mut aff) = joint_t{
+            aff.affine = global_t.affine();
+        }
+        
     } 
 
 
@@ -158,7 +161,7 @@ fn check_reachable(
     end_points: Vec<Entity>,
     sub_chains: Vec<(Entity, f32)>,
     ee_joint_q: Query<&EndEffectorJoint>,
-    transforms: Query<(&Transform, &JointTransform, &GlobalTransform)>,
+    transforms: Query<(&Transform, Option<&JointTransform>, &GlobalTransform)>,
 )-> Vec<(Entity, Entity, Entity)>{
     let mut ignore = vec![];
     for (i, entity) in end_points.iter().enumerate() {
