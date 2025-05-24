@@ -130,7 +130,7 @@ pub fn solve(
 
 
 
-// this is temp
+
 fn forward_reach_setup(
     start_joint: Entity,
     joint_children_q: Query<&JointChildren>,
@@ -139,7 +139,7 @@ fn forward_reach_setup(
 ) -> (Vec<Entity>, Vec<(Entity, f32)>){
     let mut end_points = vec![start_joint];
     let start_length = joint_q.get(start_joint).unwrap().1.length;
-    let mut subchains = vec![(start_joint, start_length)];
+    let mut subchains = vec![(start_joint, start_length * 0.5)];
     let mut active = vec![true];
     
     //this current count is the number of branches
