@@ -82,6 +82,14 @@ pub fn solve(
             
             for x in 0..settings.iterations {
                 forward_reach(joint_transforms.reborrow(), joint_q, start_entity, joint_children_q, joint_parent_q, ee_joint_q, ignore_chains.clone());
+
+                let new_dist = backward_reach(joint_transforms.reborrow(), joint_q, start_entity, joint_children_q, joint_parent_q, ee_joint_q, base_translation.into());
+
+                if new_dist == summed_dist {
+                    break;
+                }else{
+                    summed_dist = new_dist;
+                }
             }
         }
 
@@ -356,7 +364,7 @@ fn reach_out_full(
     }
 }
 
-
+// SOMETHING IS CURRENTLY BROKEN!
 fn forward_reach(
     mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
     joint_q: Query<(Entity, &Joint)>,
@@ -376,6 +384,7 @@ fn forward_reach(
     
     
     while !exhausted{
+        let mut skip_turn = false;
         while i < current_count {
             if let Ok(joint) = joint_q.get(current[i]) {
 
@@ -465,20 +474,105 @@ fn forward_reach(
                             current[i] = joint_parent.0;
                         }else{
                             current.remove(i);
-                            i -= 1;
+                            skip_turn = true;
                             current_count -= 1;
                         }
                     }
                 }
 
-                if current[i] == start_entity.0 {
+                if current.is_empty() {
                     exhausted = true;
                 }
             }
+            if !skip_turn {
+               i += 1; 
+            }else{
+                skip_turn = false;
+            }
             
-            i += 1;
         }
         i = 0;
     }
 }
 
+fn backward_reach(
+    mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
+    joint_q: Query<(Entity, &Joint)>,
+    start_entity: (Entity, &Joint),
+    joint_children_q: Query<&JointChildren>,
+    joint_parent_q: Query<&JointParent>,
+    ee_joint_q: Query<&EndEffectorJoint>,
+    base_pos: Vec3A,
+) -> f32{
+    //return this value
+    let mut current = vec![];
+    let mut current_count = 0;
+    let mut i = 0;
+    let mut summed_dist = 0.0;
+    let (_, mut first_jt, _) = joint_transforms.get_mut(start_entity.0).unwrap();
+    if start_entity.1.halfway{
+        first_jt.affine.translation = base_pos + (first_jt.affine.local_y() * start_entity.1.length * 0.5);
+    }else{
+        first_jt.affine.translation = base_pos;
+    }
+    if let Ok(children) = joint_children_q.get(start_entity.0){
+        for c in 0..children.0.len(){
+            current.push(children.0[c]);
+            current_count += 1;
+        }
+    }
+    while !current.is_empty() {
+        while i < current_count {
+
+            let parent = joint_parent_q.get(current[i]).unwrap();
+
+            let parent_affine = joint_transforms.get(parent.0).unwrap().1.affine;
+            let parent_joint = *joint_q.get(parent.0).unwrap().1;
+
+            let parent_pos = if parent_joint.halfway{
+                parent_affine.translation + (parent_affine.local_y() * parent_joint.length * 0.5)
+            } else {
+                parent_affine.translation + (parent_affine.local_y() * parent_joint.length)
+            };
+
+            let (_, mut jt, _) = joint_transforms.get_mut(current[i]).unwrap();
+            let c_joint = joint_q.get(current[i]).unwrap().1;
+            let final_pos = if c_joint.halfway{
+                parent_pos + (jt.affine.local_y() * c_joint.length * 0.5)
+            }else{
+                parent_pos    
+            };
+            jt.affine.translation = final_pos;
+            let end_point = if c_joint.halfway{
+                final_pos + (jt.affine.local_y() * c_joint.length * 0.5)
+            }else{
+                final_pos + (jt.affine.local_y() * c_joint.length)
+            };
+            if let Ok(children) = joint_children_q.get(current[i]){
+                for c in 0..children.0.len(){
+                    current.push(children.0[c]);
+                    current_count += 1;
+                }
+            }else{
+                //dead end
+
+                if let Ok(ee_joint) = ee_joint_q.get(current[i]){
+                    let ee_t = joint_transforms.get(ee_joint.ee).unwrap().1;
+                    let dist = end_point.distance(ee_t.affine.translation);
+                    summed_dist += dist;
+                }
+
+                current_count -= 1;
+                current.remove(i);
+            }
+
+
+
+
+            
+            i += 1;
+        }
+        i = 0;
+    }
+    summed_dist
+}
