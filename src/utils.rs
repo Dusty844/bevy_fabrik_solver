@@ -63,7 +63,7 @@ impl AffineExtra for Affine3A{
             _ => first_rotation,
 
         };
-        *self = Affine3A::from_scale_rotation_translation(srt.0, srt.1, srt.2);
+        *self = Affine3A::from_scale_rotation_translation(srt.0, srt.1.normalize(), srt.2);
         
         
     }
