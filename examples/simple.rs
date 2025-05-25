@@ -19,7 +19,7 @@ fn setup(
 ){
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(-0.5, 0.1, 5.0).looking_at(Vec3::ZERO, Dir3::Y),
+        Transform::from_xyz(-0.5, 1.25, 6.0).looking_at(Vec3::Y, Dir3::Y),
     ));
 
     commands.spawn((
