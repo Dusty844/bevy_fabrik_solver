@@ -47,12 +47,12 @@ fn setup(
         
     )).id();
 
-    let end_effector2 = commands.spawn((
-        Transform::from_xyz(0.15, 3.5, 0.2),
-        Name::new("End Effector 2"),
-        Mesh3d(meshes.add(Sphere::new(joint_length * 0.1))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(200, 20, 25))),
-    )).id();
+    // let end_effector2 = commands.spawn((
+    //     Transform::from_xyz(0.15, 3.5, 0.2),
+    //     Name::new("End Effector 2"),
+    //     Mesh3d(meshes.add(Sphere::new(joint_length * 0.1))),
+    //     MeshMaterial3d(materials.add(Color::srgb_u8(200, 20, 25))),
+    // )).id();
     
 
     commands.spawn((
@@ -96,25 +96,26 @@ fn setup(
                     },
                     Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                    Transform::from_xyz(0.0, joint_length, 0.5 * joint_length),
+                    Transform::from_xyz(0.0, joint_length, 0.0),
             
                 ),
-                (
-                    Joint{
-                        length: joint_length,
-                        halfway: true,
-                        ..Default::default()
-                    },
-                    EndEffectorJoint{
-                        ee: end_effector2,
-                        joint_center: true,
-                        joint_copy_rotation: false,
-                    },
-                    Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-                    MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                    Transform::from_xyz(0.0, joint_length, -0.5 * joint_length),
+                // (
+                //     Joint{
+                //         length: joint_length,
+                //         halfway: true,
+                //         ..Default::default()
+                //     },
+                //     EndEffectorJoint{
+                //         ee: end_effector2,
+                //         joint_center: true,
+                //         joint_copy_rotation: false,
+                //     },
+                //     Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
+                //     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+                //     Transform::from_xyz(0.0, joint_length, -0.5 * joint_length),
             
-                )]
+                // )
+                ]
             )]
         )]
             
