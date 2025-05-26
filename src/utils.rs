@@ -62,7 +62,7 @@ impl AffineExtra for Affine3A{
 
             _ => first_rotation,
 
-        };
+        }.normalize();
         *self = Affine3A::from_scale_rotation_translation(srt.0, srt.1.normalize(), srt.2);
         
         
@@ -74,12 +74,12 @@ impl AffineExtra for Affine3A{
         self
     }
     fn local_x(&self) -> Dir3A {
-        Dir3A::new_unchecked(self.to_scale_rotation_translation().1 * Vec3A::X)
+        Dir3A::new_unchecked(self.to_scale_rotation_translation().1 * Vec3A::X).fast_renormalize()
     }
     fn local_y(&self) -> Dir3A {
-        Dir3A::new_unchecked(self.to_scale_rotation_translation().1 * Vec3A::Y)
+        Dir3A::new_unchecked(self.to_scale_rotation_translation().1 * Vec3A::Y).fast_renormalize()
     }
     fn local_z(&self) -> Dir3A {
-        Dir3A::new_unchecked(self.to_scale_rotation_translation().1 * Vec3A::Z)
+        Dir3A::new_unchecked(self.to_scale_rotation_translation().1 * Vec3A::Z).fast_renormalize()
     }
 }
