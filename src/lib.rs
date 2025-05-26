@@ -14,7 +14,7 @@ pub struct IkSolverPlugin{
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
         app.add_systems(self.schedule, (prepare_joints, solver::solve).chain().before(TransformSystem::TransformPropagate))
-        .register_type::<(Joint, JointParent, JointChildren, Base, BaseJoint, EndEffector, EndEffectorJoint, JointTransform)>()
+        .register_type::<(Joint, JointParent, JointChildren, Base, BaseJoint, EndEffector, EndEffectorJoint, JointTransform, IkGlobalSettings)>()
         .insert_resource(IkGlobalSettings::default())
 
 ;
@@ -46,12 +46,14 @@ impl IkSolverPlugin {
 #[reflect(Resource, Debug)]
 pub struct IkGlobalSettings{
     pub iterations: usize,
+    pub minimum_tolerance: f32,
 }
 
 impl Default for IkGlobalSettings{
     fn default() -> Self {
         Self{
-            iterations: 10
+            iterations: 10,
+            minimum_tolerance: 0.002,
         }
     }
 }
