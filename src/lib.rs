@@ -7,6 +7,8 @@ mod solver;
 
 mod utils;
 
+mod constraint;
+
 pub struct IkSolverPlugin{
     schedule: Interned<dyn ScheduleLabel>,
 }
@@ -88,6 +90,24 @@ pub struct Joint{
 pub struct JointTransform{
     affine: Affine3A,        
 }
+
+/// The Rotation Constraint of a [`Joint`]
+#[derive(Component, Clone, Copy, Default, Reflect, Debug)]
+#[reflect(Component, Debug)]
+#[require(Transform, JointTransform)]
+pub struct RotationConstraint{
+    /// The Angle in Radians that the joint can move up, down, left or right. Relative
+    /// to the relative rotation, and the parent joint local up.
+    pub swing_constraint: f32,
+    // The Angle in Radians that the joint can twist, Relative to the relative rotation
+    // and the parent joint local up.
+    pub twist_constraint: f32,
+    /// The Rotation Offset of the joint from the parent. For when the joint needs
+    /// to point in a different direction other than straight up from the last joint,
+    /// such as a shoulder.
+    pub relative_rotation: Quat,
+}
+
 
 
 

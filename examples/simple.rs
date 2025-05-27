@@ -40,12 +40,23 @@ fn setup(
     )).id();
 
     let end_effector1 = commands.spawn((
-        Transform::from_xyz(0.15, 3.5, 0.2),
+        Transform::from_xyz(0.15, 1.8, 0.2),
         Name::new("End Effector 1"),
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.1))),
         MeshMaterial3d(materials.add(Color::srgb_u8(200, 20, 25))),
         
     )).id();
+
+    let joint = (Joint{
+            length: joint_length,
+            halfway: true,
+            ..Default::default()
+        },
+        RotationConstraint{
+            swing_constraint: 3.1,
+        twist_constraint: 2.0,
+        relative_rotation: Quat::IDENTITY,
+        });
 
     // let end_effector2 = commands.spawn((
     //     Transform::from_xyz(0.15, 3.5, 0.2),
@@ -56,39 +67,23 @@ fn setup(
     
 
     commands.spawn((
-        Joint{
-            length: joint_length,
-            halfway: true,
-            ..Default::default()
-        },
+        joint,
         BaseJoint(base),
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.0, 0.0),
         children![(
-            Joint{
-                length: joint_length,
-                halfway: true,
-                ..Default::default()
-            },
+            joint,
             Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(0.0, joint_length, 0.0),
             children![(
-                Joint{
-                    length: joint_length,
-                    halfway: true,
-                    ..Default::default()
-                },
+                joint,
                 Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                 MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                 Transform::from_xyz(0.0, joint_length, 0.0),
                 children![(
-                    Joint{
-                        length: joint_length,
-                        halfway: true,
-                        ..Default::default()
-                    },
+                    joint,
                     EndEffectorJoint{
                         ee: end_effector1,
                         joint_center: true,

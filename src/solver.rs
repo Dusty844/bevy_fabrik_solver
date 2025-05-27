@@ -6,6 +6,9 @@ use std::collections::VecDeque;
 
 
 
+use crate::constraint::apply_constraint;
+use crate::RotationConstraint;
+use crate::utils::*;
 use super::{
     Joint,
     JointParent,
@@ -16,13 +19,13 @@ use super::{
     IkGlobalSettings
 };
 
-use super::utils::*;
+
 
 #[allow(clippy::type_complexity)]
 #[allow(clippy::too_many_arguments)]
 pub fn solve(
     base_q: Query<(Entity, &Base)>,
-    joint_q: Query<(Entity, &Joint)>,
+    joint_q: Query<(Entity, &Joint, Option<&RotationConstraint>)>,
     joint_parent_q: Query<&JointParent>,
     joint_children_q: Query<&JointChildren>,
     ee_joint_q: Query<&EndEffectorJoint>,
@@ -148,9 +151,9 @@ pub fn solve(
 
 
 fn forward_reach_setup(
-    start_joint: (Entity, &Joint),
+    start_joint: (Entity, &Joint, Option<&RotationConstraint>),
     joint_children_q: Query<&JointChildren>,
-    joint_q: Query<(Entity, &Joint)>,
+    joint_q: Query<(Entity, &Joint, Option<&RotationConstraint>)>,
     ee_joint_q: Query<&EndEffectorJoint>,
 ) -> (Vec<Entity>, Vec<(Entity, f32)>){
     let mut end_points = vec![start_joint.0];
@@ -266,7 +269,7 @@ fn check_reachable(
 
 fn forward_reach(
     mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
-    joint_q: Query<(Entity, &Joint)>,
+    joint_q: Query<(Entity, &Joint, Option<&RotationConstraint>)>,
     joint_children_q: Query<&JointChildren>,
     joint_parent_q: Query<&JointParent>,
     ee_joint_q: Query<&EndEffectorJoint>,
@@ -415,8 +418,8 @@ fn forward_reach(
 #[allow(clippy::too_many_arguments)]
 fn backward_reach(
     mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
-    joint_q: Query<(Entity, &Joint)>,
-    start_entity: (Entity, &Joint),
+    joint_q: Query<(Entity, &Joint, Option<&RotationConstraint>)>,
+    start_entity: (Entity, &Joint, Option<&RotationConstraint>),
     joint_children_q: Query<&JointChildren>,
     joint_parent_q: Query<&JointParent>,
     ee_joint_q: Query<&EndEffectorJoint>,
@@ -470,14 +473,15 @@ fn backward_reach(
         let parent = joint_parent_q.get(entity).unwrap();
         let parent_affine = joint_transforms.get(parent.0).unwrap().1.affine;
         let parent_rot = parent_affine.to_scale_rotation_translation().1;
+        let parent_up = Dir3A::Y;
         let parent_joint = joint_q.get(parent.0).unwrap().1;
         let mut j_t = joint_transforms.get_mut(entity).unwrap().1;
-        let joint = joint_q.get(entity).unwrap().1;
-        let offset = Vec3A::from(parent_rot * joint.offset);
-        let mut top_point = if joint.halfway {
-            j_t.affine.translation + (j_t.affine.local_y() * joint.length * 0.5) + offset
+        let joint = joint_q.get(entity).unwrap();
+        let offset = Vec3A::from(parent_rot * joint.1.offset);
+        let mut top_point = if joint.1.halfway {
+            j_t.affine.translation + (j_t.affine.local_y() * joint.1.length * 0.5) + offset
         } else {
-            j_t.affine.translation + (j_t.affine.local_y() * joint.length) + offset
+            j_t.affine.translation + (j_t.affine.local_y() * joint.1.length) + offset
         };
         let bottom_point = if parent_joint.halfway {
             parent_affine.translation + (parent_affine.local_y() * parent_joint.length * 0.5) + offset
@@ -487,19 +491,25 @@ fn backward_reach(
 
         let r_i = (top_point - bottom_point - offset).length();
         let dir = (top_point - bottom_point - offset).normalize_or(j_t.affine.local_y().as_vec3a());
-        let lamda_i = joint.length / r_i;
+        let lamda_i = joint.1.length / r_i;
 
         top_point = (1.0 - lamda_i) * bottom_point + lamda_i * top_point;
 
-        j_t.affine.translation = if joint.halfway {
-            top_point - (dir * joint.length * 0.5) + offset
+        j_t.affine.translation = if joint.1.halfway {
+            top_point - (dir * joint.1.length * 0.5) + offset
         } else {
-            top_point - (dir * joint.length) + offset
+            top_point - (dir * joint.1.length) + offset
         };
 
         let local_z = j_t.affine.local_z();
 
-        j_t.affine.align(Dir3::Y, Dir3A::new(dir).unwrap(), Dir3::Z, local_z);        
+        j_t.affine.align(Dir3::Y, Dir3A::new(dir).unwrap(), Dir3::Z, local_z);
+        if let Some(rot_constraint) = joint.2 {
+            let affine = &j_t.affine;
+            j_t.affine = apply_constraint(parent_up, *affine, *joint.1, *rot_constraint, bottom_point);
+            
+        }
+            
 
         if let Ok(children) = joint_children_q.get(entity) {
             for child in &children.0 {
@@ -508,10 +518,10 @@ fn backward_reach(
         } else {
             // Dead end: check if it's an end effector
             if let Ok(ee_joint) = ee_joint_q.get(entity) {
-                let end_point = if joint.halfway{
-                    j_t.affine.translation + (j_t.affine.local_y() * joint.length * 0.5)
+                let end_point = if joint.1.halfway{
+                    j_t.affine.translation + (j_t.affine.local_y() * joint.1.length * 0.5)
                 } else{
-                    j_t.affine.translation + (j_t.affine.local_y() * joint.length)
+                    j_t.affine.translation + (j_t.affine.local_y() * joint.1.length)
                 };
                 let ee_t = joint_transforms.get(ee_joint.ee).unwrap().1;
                 summed_dist += end_point.distance(ee_t.affine.translation);
