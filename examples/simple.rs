@@ -53,8 +53,8 @@ fn setup(
             ..Default::default()
         },
         RotationConstraint{
-            swing_constraint: 3.1,
-        twist_constraint: 2.0,
+        swing_constraint: 0.5,
+        twist_constraint: 0.5,
         relative_rotation: Quat::IDENTITY,
         });
 

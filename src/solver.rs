@@ -353,6 +353,16 @@ fn forward_reach(
 
                     let local_z = joint_t.affine.local_z();
                     joint_t.affine.align(Dir3::Y, Dir3A::new(dir).unwrap(), Dir3::Z, local_z);
+
+                    // if let Some(rot_constraint) = joint.2 {
+                    //     let dir2 = Dir3A::new_unchecked((parent_temp.translation - joint_t.affine.translation).normalize());
+                    //     let affine = &joint_t.affine;
+                    //     joint_t.affine = apply_constraint(dir2, *affine, *rot_constraint);
+                    //     let local_up = joint_t.affine.local_y();
+                    //     if joint.1.halfway {
+                    //         joint_t.affine.translation = p_i1 - (local_up * joint.1.length * 0.5);
+                    //     }
+                    // }
                     
 
                 } else if let Ok(ee_joint) = ee_joint_q.get(entity){
@@ -473,7 +483,7 @@ fn backward_reach(
         let parent = joint_parent_q.get(entity).unwrap();
         let parent_affine = joint_transforms.get(parent.0).unwrap().1.affine;
         let parent_rot = parent_affine.to_scale_rotation_translation().1;
-        let parent_up = Dir3A::Y;
+        
         let parent_joint = joint_q.get(parent.0).unwrap().1;
         let mut j_t = joint_transforms.get_mut(entity).unwrap().1;
         let joint = joint_q.get(entity).unwrap();
@@ -505,9 +515,13 @@ fn backward_reach(
 
         j_t.affine.align(Dir3::Y, Dir3A::new(dir).unwrap(), Dir3::Z, local_z);
         if let Some(rot_constraint) = joint.2 {
+            let dir2 = Dir3A::new_unchecked((parent_affine.translation - j_t.affine.translation).normalize());
             let affine = &j_t.affine;
-            j_t.affine = apply_constraint(parent_up, *affine, *joint.1, *rot_constraint, bottom_point);
-            
+            j_t.affine = apply_constraint(dir2, *affine, *rot_constraint);
+            let local_up = j_t.affine.local_y();
+            if joint.1.halfway {
+                j_t.affine.translation = bottom_point + (local_up * joint.1.length * 0.5);
+            }
         }
             
 

@@ -6,9 +6,7 @@ use super::{Joint, RotationConstraint};
 pub fn apply_constraint(
     dir: Dir3A,
     mut affine: Affine3A,
-    joint: Joint,
     constraint: RotationConstraint,
-    base: Vec3A,
 ) -> Affine3A{
     let mut srt = affine.to_scale_rotation_translation();
     
@@ -27,9 +25,7 @@ pub fn apply_constraint(
     srt.1 = rest_rot * (constrained_twist * constrained_swing);
         
     affine = Affine3A::from_scale_rotation_translation(srt.0, srt.1, srt.2);
-    if joint.halfway {
-        affine.translation = base + (affine.local_y() * joint.length * 0.5);
-    }
+    
     
     affine
 }
