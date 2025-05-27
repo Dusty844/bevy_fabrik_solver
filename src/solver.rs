@@ -3,19 +3,16 @@ use bevy::math::Affine3A;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use std::collections::VecDeque;
-use std::ops::RemAssign;
-use std::sync::{Arc, Mutex};
+
+
 
 use super::{
     Joint,
     JointParent,
     JointChildren,
     Base,
-    BaseJoint,
-    EndEffector,
     EndEffectorJoint,
     JointTransform,
-    SubBase,
     IkGlobalSettings
 };
 
@@ -29,7 +26,6 @@ pub fn solve(
     joint_parent_q: Query<&JointParent>,
     joint_children_q: Query<&JointChildren>,
     ee_joint_q: Query<&EndEffectorJoint>,
-    //mut sub_base_q: Query<&mut SubBase>,
     mut joint_transforms: Query<(Entity, &mut JointTransform, Option<&ChildOf>)>,
     mut transforms: ParamSet<(
         Query<(&mut Transform, &GlobalTransform)>,
@@ -360,15 +356,21 @@ fn forward_reach(
                     //the end effector variables are not supported for now...
                     let t_affine = joint_transforms.get(ee_joint.ee).unwrap().1.affine;
                     
-                    //let target_dir = t_affine.local_y();
+                    let target_dir = t_affine.local_y();
                     let mut joint_t = joint_transforms.get_mut(entity).unwrap().1;
-                    let p_i1 = t_affine.translation;
+                    let mut p_i1 = t_affine.translation;
                     let mut p_i = if joint.1.halfway{
                         joint_t.affine.translation - (joint_t.affine.local_y() * joint.1.length * 0.5)  
                     } else {
                         joint_t.affine.translation
                     };
-
+                    
+                    if ee_joint.joint_center{
+                        p_i1 += joint_t.affine.local_y() * joint.1.length * 0.5;
+                    }
+                    if ee_joint.joint_copy_rotation {
+                        p_i = p_i1 - (target_dir * joint.1.length);
+                    }
                     
                     let r_i = (p_i1 - p_i).length();
                     let dir = (p_i1 - p_i).normalize_or(joint_t.affine.local_y().as_vec3a());
@@ -377,9 +379,9 @@ fn forward_reach(
                     p_i = (1.0 - lambda) * p_i1 + lambda * p_i;
 
                     joint_t.affine.translation = if joint.1.halfway {
-                        p_i + (dir * joint.1.length * 0.5)
+                        p_i + (dir * joint.1.length * 0.5) 
                     } else {
-                        p_i
+                        p_i 
                     };
 
                     let local_z = joint_t.affine.local_z();

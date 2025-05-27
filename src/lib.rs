@@ -90,20 +90,6 @@ pub struct JointTransform{
 }
 
 
-/// Internal tag component used to denote a "sub-base", or a [`Joint`] with more
-/// than one child [`Joint`]. 
-///
-/// A [`Joint`] with more than one [`JointChildren`] that is found in the
-/// query without a `SubBase` during the prepare phase is given one. A `SubBase`
-/// in a [`Joint`] chain always indicates that the [`Joint`] chain has multiple
-/// [`EndEffector`]s, or branches. (MAYBE)
-///
-/// The Entity Field Points Either To the Root Joint Or The Last SubBase.
-#[derive(Component, Clone, Copy, Reflect, Debug)]
-#[reflect(Component, Debug)]
-#[require(Transform)]
-pub struct SubBase(pub Entity);
-
 
 #[derive(Component, Debug, PartialEq, Eq, Reflect)]
 #[relationship(relationship_target = JointChildren)]
