@@ -53,8 +53,14 @@ fn setup(
             ..Default::default()
         },
         RotationConstraint{
-        swing_constraint: 0.5,
-        twist_constraint: 0.5,
+        dir: Vec3::Y,
+        
+        swing_min: Vec3::splat(-0.1),
+        twist_min: Vec3::splat(-0.5),
+        
+        swing_max: Vec3::splat(0.0),
+        twist_max: Vec3::splat(0.5),
+        
         relative_rotation: Quat::IDENTITY,
         });
 

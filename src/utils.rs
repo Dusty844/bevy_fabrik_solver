@@ -13,6 +13,7 @@ pub trait QuatExtra{
     fn twist_swing(&self, dir: Vec3) -> (Quat, Quat);
     fn constrain(rotation: Quat, angle: f32) -> Quat;
     fn abs(&self) -> Quat;
+    fn align(&mut self, main_axis: impl TryInto<Dir3>, main_dir: impl TryInto<Dir3>, second_axis: impl TryInto<Dir3>, second_dir: impl TryInto<Dir3>);
 }
 
 impl AffineExtra for Affine3A{
@@ -106,5 +107,45 @@ impl QuatExtra for Quat{
         }else {
             *self
         }
+    }
+
+    fn align(&mut self, main_axis: impl TryInto<Dir3>, main_dir: impl TryInto<Dir3>, second_axis: impl TryInto<Dir3>, second_dir: impl TryInto<Dir3>){
+        let main_axis = main_axis.try_into().unwrap_or(Dir3::X);
+
+        let main_direction = main_dir.try_into().unwrap_or(Dir3::X);
+
+        let secondary_axis = second_axis.try_into().unwrap_or(Dir3::Y);
+
+        let secondary_direction = second_dir.try_into().unwrap_or(Dir3::Y);
+        
+        let first_rotation = Quat::from_rotation_arc(main_axis.into(), main_direction.into());
+        
+        let secondary_image = first_rotation * secondary_axis;
+        let secondary_image_ortho = secondary_image
+            .reject_from_normalized(main_direction.into())
+            .try_normalize();
+        let secondary_direction_ortho = secondary_direction
+            .reject_from_normalized(main_direction.into())
+            .try_normalize();
+
+                
+        *self = match (secondary_image_ortho, secondary_direction_ortho) {
+
+            (Some(secondary_img_ortho), Some(secondary_dir_ortho)) => {
+
+                let second_rotation =
+
+                    Quat::from_rotation_arc(secondary_img_ortho, secondary_dir_ortho);
+
+                second_rotation * first_rotation
+
+            }
+
+            _ => first_rotation,
+
+        }.normalize();
+        
+        
+        
     }
 }

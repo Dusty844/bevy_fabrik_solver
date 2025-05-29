@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 
 
 
-use crate::constraint::apply_constraint;
+use crate::constraint::*;
 use crate::RotationConstraint;
 use crate::utils::*;
 use super::{
@@ -314,14 +314,21 @@ fn forward_reach(
                     let mut offset_avg = Vec3A::ZERO;
                     let parent_temp = joint_transforms.get(entity).unwrap().1.affine;
                     let rot = parent_temp.to_scale_rotation_translation().1;
+                    let mut constraint_maybe: Option<&RotationConstraint> = None;
 
                     for c in 0..children.len() {
                         let child_affine = joint_transforms.get(children.0[c]).unwrap().1.affine;
-                        let child_joint = joint_q.get(children.0[c]).unwrap().1;
-                        let offset = Vec3A::from(rot * child_joint.offset);
+                        let child_joint = joint_q.get(children.0[c]).unwrap();
+                        if let Some(child_constraint) = child_joint.2{
+                            //gets the first constrained child
+                            if constraint_maybe.is_none() {
+                                constraint_maybe = Some(child_constraint)
+                            }
+                        }
+                        let offset = Vec3A::from(rot * child_joint.1.offset);
                         offset_avg += offset;
-                        let bottom_point = if child_joint.halfway{
-                            child_affine.translation - (child_affine.local_y() * child_joint.length * 0.5) + offset
+                        let bottom_point = if child_joint.1.halfway{
+                            child_affine.translation - (child_affine.local_y() * child_joint.1.length * 0.5) + offset
                         } else {
                             child_affine.translation + offset
                         };
@@ -338,9 +345,14 @@ fn forward_reach(
                     } else {
                         joint_t.affine.translation - offset_avg
                     };
-
+                    
+                    let mut dir = (p_i1 - p_i - offset_avg).normalize_or(joint_t.affine.local_y().as_vec3a());
+                    if let Some(constraint) = constraint_maybe{
+                        constrain_forward(&mut dir, &mut p_i, p_i1, constraint, joint_t.affine.to_scale_rotation_translation().1, joint.1);
+                    }
+                    
                     let r_i = (p_i1 - p_i - offset_avg).length();
-                    let dir = (p_i1 - p_i - offset_avg).normalize_or(joint_t.affine.local_y().as_vec3a());
+                    
                     let lamda_i = joint.1.length / r_i;
 
                     p_i = (1.0 - lamda_i) * p_i1 + lamda_i * p_i;
@@ -514,15 +526,15 @@ fn backward_reach(
         let local_z = j_t.affine.local_z();
 
         j_t.affine.align(Dir3::Y, Dir3A::new(dir).unwrap(), Dir3::Z, local_z);
-        if let Some(rot_constraint) = joint.2 {
-            let dir2 = Dir3A::new_unchecked((parent_affine.translation - j_t.affine.translation).normalize());
-            let affine = &j_t.affine;
-            j_t.affine = apply_constraint(dir2, *affine, *rot_constraint);
-            let local_up = j_t.affine.local_y();
-            if joint.1.halfway {
-                j_t.affine.translation = bottom_point + (local_up * joint.1.length * 0.5);
-            }
-        }
+        // if let Some(rot_constraint) = joint.2 {
+        //     let dir2 = Dir3A::new_unchecked((parent_affine.translation - j_t.affine.translation).normalize());
+        //     let affine = &j_t.affine;
+        //     j_t.affine = apply_constraint(dir2, *affine, *rot_constraint);
+        //     let local_up = j_t.affine.local_y();
+        //     if joint.1.halfway {
+        //         j_t.affine.translation = bottom_point + (local_up * joint.1.length * 0.5);
+        //     }
+        // }
             
 
         if let Ok(children) = joint_children_q.get(entity) {
