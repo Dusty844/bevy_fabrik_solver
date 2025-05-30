@@ -67,5 +67,39 @@ pub fn constrain_forward(
         p_i1 - (*up_dir * parent_joint.length)
     };
     
-    
+}
+
+pub fn constrain_backward(
+    up_dir: &mut Vec3A,
+    p_i1: &mut Vec3A,
+    p_i: Vec3A,
+    constraint: &RotationConstraint,
+    parent_rot: Quat,
+    child_rot: Quat,
+    current_joint: &Joint,
+){
+    let local_z = Dir3::new_unchecked(child_rot * Vec3::Z);
+    let mut theoretical = Quat::IDENTITY;
+    theoretical.align(Dir3::Y, Dir3A::new_unchecked(*up_dir), Dir3::Z, local_z);
+
+    theoretical = parent_rot.conjugate() * theoretical;
+    let (mut twist, mut swing) = theoretical.twist_swing(constraint.dir);
+
+    //convert to scaled axes to be clamped.
+    let mut scaled_twist = twist.to_scaled_axis();
+    let mut scaled_swing = swing.to_scaled_axis();
+
+    scaled_twist = scaled_twist.clamp(constraint.twist_min, constraint.twist_max);
+    scaled_swing = scaled_swing.clamp(constraint.swing_min, constraint.swing_max);
+
+    twist = Quat::from_scaled_axis(scaled_twist);
+    swing = Quat::from_scaled_axis(scaled_swing);
+
+    let out_rot = swing * twist;
+    *up_dir = out_rot * Vec3A::Y;
+    *p_i1 = if current_joint.halfway {
+        p_i + (*up_dir * current_joint.length * 0.5)
+    } else {
+        p_i + (*up_dir * current_joint.length)
+    };
 }

@@ -510,9 +510,16 @@ fn backward_reach(
         } else {
             parent_affine.translation + (parent_affine.local_y() * parent_joint.length) + offset
         };
-
+        
+        
+        let mut dir = (top_point - bottom_point - offset).normalize_or(j_t.affine.local_y().as_vec3a());
+        if let Some(constraint) = joint.2{
+            constrain_backward(&mut dir, &mut top_point, bottom_point, constraint, parent_rot,j_t.affine.to_scale_rotation_translation().1, joint.1);
+        }
+        
+        
         let r_i = (top_point - bottom_point - offset).length();
-        let dir = (top_point - bottom_point - offset).normalize_or(j_t.affine.local_y().as_vec3a());
+        
         let lamda_i = joint.1.length / r_i;
 
         top_point = (1.0 - lamda_i) * bottom_point + lamda_i * top_point;
