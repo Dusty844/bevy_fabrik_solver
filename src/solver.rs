@@ -314,42 +314,58 @@ fn forward_reach(
                     let mut offset_avg = Vec3A::ZERO;
                     let parent_temp = joint_transforms.get(entity).unwrap().1.affine;
                     let rot = parent_temp.to_scale_rotation_translation().1;
-                    let mut constraint_maybe: Option<&RotationConstraint> = None;
+
+                    
+                    let mut p_i = if joint.1.halfway {
+                        parent_temp.translation - (parent_temp.local_y() * joint.1.length * 0.5) - offset_avg
+                    } else {
+                        parent_temp.translation - offset_avg
+                    };
+
+                    let mut dir = Vec3A::ZERO;
+                    let mut dirs : Vec<Vec3A> = vec![];
 
                     for c in 0..children.len() {
                         let child_affine = joint_transforms.get(children.0[c]).unwrap().1.affine;
                         let child_joint = joint_q.get(children.0[c]).unwrap();
-                        if let Some(child_constraint) = child_joint.2{
-                            //gets the first constrained child
-                            if constraint_maybe.is_none() {
-                                constraint_maybe = Some(child_constraint)
-                            }
-                        }
-                        let offset = Vec3A::from(rot * child_joint.1.offset);
+                                                let offset = Vec3A::from(rot * child_joint.1.offset);
                         offset_avg += offset;
                         let bottom_point = if child_joint.1.halfway{
                             child_affine.translation - (child_affine.local_y() * child_joint.1.length * 0.5) + offset
                         } else {
                             child_affine.translation + offset
                         };
+                        let mut child_dir = (bottom_point - p_i - offset).normalize_or(child_affine.local_y().as_vec3a());
+                        if let Some(child_constraint) = child_joint.2{
+                            constrain_direction(&mut child_dir, child_constraint, rot);
+                        }
+                        //this won't work when the vectors are opposite, this may happen with say a
+                        //spine and 2 legs but that's the only sort of situation where this fails, the
+                        //solution is apparently something something 'eigen values' and 'power iterartion'
+                        //but whatever.
+                        dir += child_dir;
                         d += 1.0;
                         p_i1 += bottom_point;
                     }
                     p_i1 /= d;
                     offset_avg /= d;
+                    dir /= d;
+                    
 
                     let mut joint_t = joint_transforms.get_mut(entity).unwrap().1;
 
-                    let mut p_i = if joint.1.halfway {
-                        joint_t.affine.translation - (joint_t.affine.local_y() * joint.1.length * 0.5) - offset_avg
+                                        
+                    let backup_dir = (p_i1 - p_i - offset_avg).normalize_or(joint_t.affine.local_y().as_vec3a());
+                    dir = dir.normalize_or(backup_dir);
+                    p_i = if joint.1.halfway {
+                        p_i1 - (dir * joint.1.length * 0.5)
                     } else {
-                        joint_t.affine.translation - offset_avg
+                        p_i1 - (dir * joint.1.length)  
                     };
                     
-                    let mut dir = (p_i1 - p_i - offset_avg).normalize_or(joint_t.affine.local_y().as_vec3a());
-                    if let Some(constraint) = constraint_maybe{
-                        constrain_forward(&mut dir, &mut p_i, p_i1, constraint, joint_t.affine.to_scale_rotation_translation().1, joint.1);
-                    }
+                    // if let Some(constraint) = constraint_maybe{
+                    //     constrain_forward(&mut dir, &mut p_i, p_i1, constraint, joint_t.affine.to_scale_rotation_translation().1, joint.1);
+                    // }
                     
                     let r_i = (p_i1 - p_i - offset_avg).length();
                     
@@ -397,8 +413,15 @@ fn forward_reach(
                         p_i = p_i1 - (target_dir * joint.1.length);
                     }
                     
+                    
+                    let mut dir = (p_i1 - p_i).normalize_or(joint_t.affine.local_y().as_vec3a());
+
+                    if let Some(constraint) = joint.2{
+                        constrain_forward(&mut dir, &mut p_i, p_i1, constraint, joint_t.affine.to_scale_rotation_translation().1, joint.1);
+                    }
+
                     let r_i = (p_i1 - p_i).length();
-                    let dir = (p_i1 - p_i).normalize_or(joint_t.affine.local_y().as_vec3a());
+                    
                     let lambda = joint.1.length / r_i;
                         
                     p_i = (1.0 - lambda) * p_i1 + lambda * p_i;
@@ -457,6 +480,14 @@ fn backward_reach(
     
     //set root to base
     let mut start_t = joint_transforms.get_mut(start_entity.0).unwrap().1;
+
+    // let local_up = start_t.affine.local_y();
+
+    // start_t.affine.translation = if start_entity.1.halfway{
+    //     base_offset + (local_up * start_entity.1.length * 0.5)
+    // } else {
+    //     base_offset + (local_up * start_entity.1.length)
+    // };
     
     let mut top_point = if start_entity.1.halfway {
         start_t.affine.translation + (start_t.affine.local_y() * start_entity.1.length * 0.5)
@@ -464,8 +495,12 @@ fn backward_reach(
         start_t.affine.translation + (start_t.affine.local_y() * start_entity.1.length)
     };
 
-    let r_i = (top_point - base_pos + base_offset).length();
     let dir = (top_point - base_pos + base_offset).normalize_or(start_t.affine.local_y().as_vec3a());
+
+    
+
+    let r_i = (top_point - base_pos + base_offset).length();
+    
     let lamda_i = start_entity.1.length / r_i;
 
     top_point = (1.0 - lamda_i) * base_pos + lamda_i * top_point;
@@ -513,9 +548,9 @@ fn backward_reach(
         
         
         let mut dir = (top_point - bottom_point - offset).normalize_or(j_t.affine.local_y().as_vec3a());
-        if let Some(constraint) = joint.2{
-            constrain_backward(&mut dir, &mut top_point, bottom_point, constraint, parent_rot,j_t.affine.to_scale_rotation_translation().1, joint.1);
-        }
+        // if let Some(constraint) = joint.2{
+        //     constrain_backward(&mut dir, &mut top_point, bottom_point, constraint, parent_rot,j_t.affine.to_scale_rotation_translation().1, joint.1);
+        // }
         
         
         let r_i = (top_point - bottom_point - offset).length();
