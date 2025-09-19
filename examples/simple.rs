@@ -5,7 +5,8 @@ use bevy_egui::EguiPlugin;
 
 fn main(){
     App::new()
-        .add_plugins((DefaultPlugins, IkSolverPlugin::default()))
+        .add_plugins(DefaultPlugins)
+        //.add_plugins(IkSolverPlugin::default())
         .add_systems(Startup, setup)
         .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
         .add_plugins(WorldInspectorPlugin::new())
@@ -30,105 +31,5 @@ fn setup(
         Transform::IDENTITY.looking_at(Vec3::new(-0.2, -8.0, 0.1), Dir3::Y),
     ));
 
-    
-
-    let joint_length = 0.5;
-
-    let base = commands.spawn((
-        Transform::IDENTITY,
-        Name::new("Base"),
-    )).id();
-
-    let end_effector1 = commands.spawn((
-        Transform::from_xyz(0.15, 1.8, 0.2),
-        Name::new("End Effector 1"),
-        Mesh3d(meshes.add(Sphere::new(joint_length * 0.1))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(200, 20, 25))),
-        
-    )).id();
-
-    let joint = (Joint{
-            length: joint_length,
-            halfway: true,
-            ..Default::default()
-        },
-        RotationConstraint{
-        dir: Vec3::Y,
-        
-        swing_min: Vec3::splat(-0.8),
-        twist_min: Vec3::splat(-0.5),
-        
-        swing_max: Vec3::splat(0.8),
-        twist_max: Vec3::splat(0.5),
-        
-        relative_rotation: Quat::IDENTITY,
-        });
-
-    let end_effector2 = commands.spawn((
-        Transform::from_xyz(0.15, 3.5, 0.2),
-        Name::new("End Effector 2"),
-        Mesh3d(meshes.add(Sphere::new(joint_length * 0.1))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(200, 20, 25))),
-    )).id();
-    
-
-    commands.spawn((
-        joint,
-        BaseJoint(base),
-        Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Transform::from_xyz(0.0, 0.0, 0.0),
-        children![(
-            joint,
-            Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-            MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-            Transform::from_xyz(0.0, joint_length, 0.0),
-            children![(
-                joint,
-                Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-                MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                Transform::from_xyz(0.0, joint_length, 0.0),
-                children![(
-                    joint,
-                    Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-                    MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                    Transform::from_xyz(0.0, joint_length, 0.0),
-                    children![(
-                        joint,
-                        EndEffectorJoint{
-                            ee: end_effector1,
-                            joint_center: true,
-                            joint_copy_rotation: false,
-                        },
-                        Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-                        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                        Transform::from_xyz(0.0, joint_length, 0.0),
-                    )]
-                ),
-                (
-                    joint,
-                    Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-                    MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                    Transform::from_xyz(0.0, joint_length, 0.0),
-                    children![(
-                        joint,
-                        EndEffectorJoint{
-                            ee: end_effector2,
-                            joint_center: true,
-                            joint_copy_rotation: false,
-                        },
-                        Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-                        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                        Transform::from_xyz(0.0, joint_length, -0.5 * joint_length),
-                    )]
-                )
-                ]
-            )]
-        )]
-            
-            
-        
-    ));
-
-    
+       
 }
