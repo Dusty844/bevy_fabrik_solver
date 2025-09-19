@@ -6,8 +6,9 @@ use bevy_egui::EguiPlugin;
 fn main(){
     App::new()
         .add_plugins(DefaultPlugins)
-        //.add_plugins(IkSolverPlugin::default())
+        .add_plugins(IkSolverPlugin)
         .add_systems(Startup, setup)
+        .add_systems(PostStartup, after.after(TransformSystem::TransformPropagate))
         .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
         .add_plugins(WorldInspectorPlugin::new())
         .run();
@@ -17,6 +18,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    
 ){
     commands.spawn((
         Camera3d::default(),
@@ -30,6 +32,32 @@ fn setup(
         },
         Transform::IDENTITY.looking_at(Vec3::new(-0.2, -8.0, 0.1), Dir3::Y),
     ));
+    let joint_length = 0.1;
+
+    let joint = commands.spawn((
+        Joint{
+            length: joint_length,
+            halfway: false
+        },
+        Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+    )).id();
+
+    commands.spawn((
+        Base(joint),
+        Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Transform::from_xyz(0.0, 1.0, 0.0),
+    ));
+
+    
 
        
+}
+
+fn after(
+    bk: Res<JointBookkeeping>,
+){
+    println!("{:#?}", bk.joints.lock().unwrap());
 }

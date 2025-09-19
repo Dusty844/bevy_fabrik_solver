@@ -13,13 +13,17 @@ pub struct IkSolverPlugin;
 
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
+        #[cfg(feature = "bevy_reflect")]
+        app.register_type::<(Joint, JointParent, JointChildren, JointTransform, Base, BaseJoint, EndEffector, EEJoint, IkGlobalSettings)>();
+        app.add_systems(PreStartup, bookkeeper::joint_hooks);
+        app.add_systems(PostUpdate, (bookkeeper::collect_joint_transforms, bookkeeper::bookkeep_joints_start).chain().before(TransformSystem::TransformPropagate));
         app.insert_resource(IkGlobalSettings::default());
         app.insert_resource(JointBookkeeping::default());
     }
 }
 
-#[derive(Resource, Clone, Copy, Reflect, Debug)]
-#[reflect(Resource, Debug)]
+#[derive(Resource, Clone, Copy, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct IkGlobalSettings{
     pub iterations: usize,
     pub minimum_tolerance: f32,
@@ -45,33 +49,36 @@ impl Default for IkGlobalSettings{
 }
 
 
-#[derive(Component, Clone, Copy, Default, Reflect, Debug)]
-#[reflect(Component, Debug)]
+#[derive(Component, Clone, Copy, Default, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(Transform, JointTransform)]
 pub struct Joint{
     pub length: f32,
     pub halfway: bool,
 }
 
-#[derive(Component, Debug, PartialEq, Eq, Reflect)]
+#[derive(Component, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[relationship(relationship_target = JointChildren)]
 pub struct JointParent(Entity);
 
-#[derive(Component, Debug, Reflect, Default)]
+
+#[derive(Component, Debug, Default)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[relationship_target(relationship = JointParent)]
 pub struct JointChildren(Vec<Entity>);
 
 
 
-#[derive(Component, Clone, Copy, Default, Reflect, Debug)]
-#[reflect(Component, Debug)]
+#[derive(Component, Clone, Copy, Default, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(Transform)]
 pub struct JointTransform{
     affine: Affine3A,        
 }
 
-#[derive(Component, Clone, Copy, Reflect, Debug)]
-#[reflect(Component, Debug)]
+#[derive(Component, Clone, Copy, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(Transform, JointTransform)]
 pub struct EndEffector{
     pub joint: Entity,
@@ -79,28 +86,28 @@ pub struct EndEffector{
     pub joint_copy_rotation: bool,
 }
 
-#[derive(Component, Clone, Copy, Reflect, Debug)]
-#[reflect(Component, Debug)]
+#[derive(Component, Clone, Copy, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct EEJoint{
     pub ee: Entity,
 }
 
-#[derive(Component, Clone, Copy, Reflect, Debug)]
-#[reflect(Component, Debug)]
-#[require(Transform)]
+#[derive(Component, Clone, Copy, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[require(JointTransform)]
 pub struct Base(pub Entity);
 
-#[derive(Component, Clone, Copy, Reflect, Debug)]
-#[reflect(Component, Debug)]
-#[require(Transform)]
+#[derive(Component, Clone, Copy, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[require(JointTransform)]
 pub struct BaseJoint(pub Entity);
 
 
 #[derive(Resource, Clone, Debug)]
 pub struct JointBookkeeping{
-    pub joints: Arc<Mutex<HashMap<(Joint, JointTransform), Entity>>>,
-    pub ends: HashMap<EndEffector, Entity>,
-    pub bases: HashMap<Base, Entity>,
+    pub joints: Arc<Mutex<HashMap<Entity, (Joint, JointTransform)>>>,
+    pub ends: HashMap<Entity, (EndEffector, JointTransform)>,
+    pub bases: HashMap<Entity, (Base, JointTransform)>,
 }
 
 impl Default for JointBookkeeping{
