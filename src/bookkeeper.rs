@@ -1,3 +1,5 @@
+use crate::{JointChildren, JointParent};
+
 use super::{
     Joint,
     JointBookkeeping,
@@ -8,7 +10,7 @@ use super::{
     BaseJoint,
 };
 
-use bevy::{ecs::component::HookContext, prelude::*};
+use bevy::prelude::*;
 
 
 
@@ -28,7 +30,7 @@ pub fn joint_hooks(
     world.register_component_hooks::<EndEffector>()
     .on_remove(
         |mut world, context|{
-            let (ee, _) = world.resource_mut::<JointBookkeeping>().ends.remove(&context.entity).unwrap();
+            let (ee, _) = world.resource_mut::<JointBookkeeping>().ends.write().unwrap().remove(&context.entity).unwrap();
             world.commands().entity(ee.joint).try_remove::<EEJoint>();
         }
     );
@@ -38,7 +40,7 @@ pub fn joint_hooks(
     world.register_component_hooks::<Base>()
     .on_remove(
         |mut world, context|{
-            let (base, _) = world.resource_mut::<JointBookkeeping>().bases.remove(&context.entity).unwrap();
+            let (base, _) = world.resource_mut::<JointBookkeeping>().bases.write().unwrap().remove(&context.entity).unwrap();
             world.commands().entity(base.0).try_remove::<BaseJoint>();
         }
     );
@@ -56,9 +58,9 @@ pub fn collect_joint_transforms(
 }
 
 
-
+#[allow(clippy::type_complexity)]
 pub fn bookkeep_joints_start(
-    mut joint_bookkeeper: ResMut<JointBookkeeping>,
+    joint_bookkeeper: Res<JointBookkeeping>,
     joints_q: Query<(&Joint, &JointTransform, Entity), Or<(Added<Joint>, Changed<Joint>, Changed<JointTransform>)>>,
     end_effectors_q: Query<(&EndEffector, &JointTransform, Entity), Or<(Added<EndEffector>, Changed<EndEffector>, Changed<JointTransform>)>>,
     bases_q: Query<(&Base, &JointTransform, Entity), Or<(Added<Base>, Changed<Base>, Changed<JointTransform>)>>,
@@ -69,13 +71,107 @@ pub fn bookkeep_joints_start(
     }
 
     for (end_effector, jt, entity) in end_effectors_q.iter(){
-        joint_bookkeeper.ends.insert(entity, (*end_effector, *jt));
+        joint_bookkeeper.ends.write().unwrap().insert(entity, (*end_effector, *jt));
     }
 
     for (base, jt, entity) in bases_q.iter() {
-        joint_bookkeeper.bases.insert(entity, (*base, *jt));
+        joint_bookkeeper.bases.write().unwrap().insert(entity, (*base, *jt));
+    }
+
+}
+
+#[allow(clippy::type_complexity)]
+pub fn sync_transforms(
+    joint_bookkeeper: Res<JointBookkeeping>, 
+    mut transforms_param_set: ParamSet<(
+        Query<(&mut Transform, Option<&ChildOf>), With<JointTransform>>,
+        TransformHelper,
+    )>,
+    parents_q: Query<&ChildOf, With<JointTransform>>,
+) {
+
+    
+
+
+    //joints, dont really like having to lock the whole thing, but it doesnt seem possible to do something like [i], maybe it is ill have to find out
+    
+    for (entity, (_, jt)) in joint_bookkeeper.joints.lock().unwrap().iter() {
+        let maybe_parent = parents_q.get(*entity);
+        
+        if let Ok(parent) = maybe_parent{
+            
+            let new_gt = transforms_param_set.p1().compute_global_transform(parent.0).unwrap();
+            let new_affine = new_gt.affine().inverse();
+            let final_affine = new_affine * jt.affine;
+            let srt = final_affine.to_scale_rotation_translation();
+
+            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+
+            if new_transform.is_finite(){
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+            }
+        }else{
+            let srt = jt.affine.to_scale_rotation_translation();
+            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+
+            if new_transform.is_finite(){
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+            }
+        }
+    }
+
+    for (entity, (_, jt)) in joint_bookkeeper.ends.write().unwrap().iter() {
+        let maybe_parent = parents_q.get(*entity);
+        
+        if let Ok(parent) = maybe_parent{
+            
+            let new_gt = transforms_param_set.p1().compute_global_transform(parent.0).unwrap();
+            let new_affine = new_gt.affine().inverse();
+            let final_affine = new_affine * jt.affine;
+            let srt = final_affine.to_scale_rotation_translation();
+
+            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+
+            if new_transform.is_finite(){
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+            }
+        }else{
+            let srt = jt.affine.to_scale_rotation_translation();
+            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+
+            if new_transform.is_finite(){
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+            }
+        }
+    }
+
+
+    for (entity, (_, jt)) in joint_bookkeeper.bases.write().unwrap().iter() {
+        let maybe_parent = parents_q.get(*entity);
+        
+        if let Ok(parent) = maybe_parent{
+            
+            let new_gt = transforms_param_set.p1().compute_global_transform(parent.0).unwrap();
+            let new_affine = new_gt.affine().inverse();
+            let final_affine = new_affine * jt.affine;
+            let srt = final_affine.to_scale_rotation_translation();
+
+            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+
+            if new_transform.is_finite(){
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+            }
+        }else{
+            let srt = jt.affine.to_scale_rotation_translation();
+            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
+
+            if new_transform.is_finite(){
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+            }
+        }
     }
     
+        
     
     
 }

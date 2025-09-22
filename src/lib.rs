@@ -3,7 +3,8 @@ use bevy::{
     math::Affine3A,
     platform::collections::HashMap,
 };
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
+use forte::ThreadPool;
 
 mod solver;
 
@@ -13,12 +14,24 @@ pub struct IkSolverPlugin;
 
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
+        POOL.resize_to_available();
+        
         #[cfg(feature = "bevy_reflect")]
         app.register_type::<(Joint, JointParent, JointChildren, JointTransform, Base, BaseJoint, EndEffector, EEJoint, IkGlobalSettings)>();
+        
         app.add_systems(PreStartup, bookkeeper::joint_hooks);
-        app.add_systems(PostUpdate, (bookkeeper::collect_joint_transforms, bookkeeper::bookkeep_joints_start).chain().before(TransformSystem::TransformPropagate));
+        
+        app.add_systems(PostUpdate, (
+            bookkeeper::collect_joint_transforms,
+            bookkeeper::bookkeep_joints_start,
+            solver::solve,
+            bookkeeper::sync_transforms,
+        ).chain().before(TransformSystem::TransformPropagate));
+        
         app.insert_resource(IkGlobalSettings::default());
         app.insert_resource(JointBookkeeping::default());
+
+        
     }
 }
 
@@ -60,12 +73,14 @@ pub struct Joint{
 #[derive(Component, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[relationship(relationship_target = JointChildren)]
+#[require(Joint)]
 pub struct JointParent(Entity);
 
 
 #[derive(Component, Debug, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[relationship_target(relationship = JointParent)]
+#[require(Joint)]
 pub struct JointChildren(Vec<Entity>);
 
 
@@ -88,6 +103,7 @@ pub struct EndEffector{
 
 #[derive(Component, Clone, Copy, Debug)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[require(Joint)]
 pub struct EEJoint{
     pub ee: Entity,
 }
@@ -106,16 +122,23 @@ pub struct BaseJoint(pub Entity);
 #[derive(Resource, Clone, Debug)]
 pub struct JointBookkeeping{
     pub joints: Arc<Mutex<HashMap<Entity, (Joint, JointTransform)>>>,
-    pub ends: HashMap<Entity, (EndEffector, JointTransform)>,
-    pub bases: HashMap<Entity, (Base, JointTransform)>,
+    pub parents: Arc<RwLock<HashMap<Entity, JointParent>>>,
+    pub children: Arc<RwLock<HashMap<Entity, JointChildren>>>,
+    pub ends: Arc<RwLock<HashMap<Entity, (EndEffector, JointTransform)>>>,
+    pub bases: Arc<RwLock<HashMap<Entity, (Base, JointTransform)>>>,
 }
 
 impl Default for JointBookkeeping{
     fn default() -> Self {
         Self{
             joints: Arc::new(Mutex::new(HashMap::new())),
-            ends: HashMap::new(),
-            bases: HashMap::new(),
+            parents: Arc::new(RwLock::new(HashMap::new())),
+            children: Arc::new(RwLock::new(HashMap::new())),
+            ends: Arc::new(RwLock::new(HashMap::new())),
+            bases: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
+
+
+pub static POOL: ThreadPool = ThreadPool::new();
