@@ -35,6 +35,7 @@ fn setup(
     let joint_length = 0.1;
 
     let joint = commands.spawn((
+        Name::new("BaseJoint"),
         Joint{
             length: joint_length,
             halfway: false
@@ -42,12 +43,23 @@ fn setup(
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.0, 0.0),
+        children![(
+            Name::new("Joint"),
+            Joint{
+                length: joint_length,
+                halfway: false
+            },
+            Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
+            MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+            Transform::from_xyz(0.0, joint_length, 0.0),
+        )]
     )).id();
 
     commands.spawn((
+        Name::new("Base"),
         Base(joint),
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(200, 144, 255))),
         Transform::from_xyz(0.0, 1.0, 0.0),
     ));
 

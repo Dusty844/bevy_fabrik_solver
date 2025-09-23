@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{JointChildren, JointParent};
 
 use super::{
@@ -28,16 +30,28 @@ pub fn joint_hooks(
 
     //removes end effector from book, and removes the ee joint on the other end
     world.register_component_hooks::<EndEffector>()
-    .on_remove(
-        |mut world, context|{
-            let (ee, _) = world.resource_mut::<JointBookkeeping>().ends.write().unwrap().remove(&context.entity).unwrap();
-            world.commands().entity(ee.joint).try_remove::<EEJoint>();
-        }
-    );
+        .on_add(|mut world, context|{
+            let joint = world.get::<EndEffector>(context.entity).unwrap().joint;
+            world.commands().entity(joint).insert(EEJoint(context.entity));
+            //handles only insertion of basejoint
+        
+        })
+        .on_remove(
+            |mut world, context|{
+                let (ee, _) = world.resource_mut::<JointBookkeeping>().ends.write().unwrap().remove(&context.entity).unwrap();
+                world.commands().entity(ee.joint).try_remove::<EEJoint>();
+            }
+        );
 
 
     //same as above
     world.register_component_hooks::<Base>()
+    .on_add(|mut world, context|{
+        let joint = world.get::<Base>(context.entity).unwrap().0;
+        world.commands().entity(joint).insert(BaseJoint(context.entity));
+        //handles only insertion of basejoint
+        
+    })
     .on_remove(
         |mut world, context|{
             let (base, _) = world.resource_mut::<JointBookkeeping>().bases.write().unwrap().remove(&context.entity).unwrap();
@@ -64,6 +78,8 @@ pub fn bookkeep_joints_start(
     joints_q: Query<(&Joint, &JointTransform, Entity), Or<(Added<Joint>, Changed<Joint>, Changed<JointTransform>)>>,
     end_effectors_q: Query<(&EndEffector, &JointTransform, Entity), Or<(Added<EndEffector>, Changed<EndEffector>, Changed<JointTransform>)>>,
     bases_q: Query<(&Base, &JointTransform, Entity), Or<(Added<Base>, Changed<Base>, Changed<JointTransform>)>>,
+    parent_setup: Query<(Entity, &ChildOf), Added<Joint>>,
+    mut commands: Commands,
 ){
     //Joints first, could make par iter
     for (joint, jt, entity) in joints_q.iter(){
@@ -76,6 +92,9 @@ pub fn bookkeep_joints_start(
 
     for (base, jt, entity) in bases_q.iter() {
         joint_bookkeeper.bases.write().unwrap().insert(entity, (*base, *jt));
+    }
+    for (entity, parent) in parent_setup.iter(){
+        commands.entity(entity).try_insert_if_new(JointParent(parent.0));
     }
 
 }
@@ -108,68 +127,19 @@ pub fn sync_transforms(
             let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
 
             if new_transform.is_finite(){
-                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0.bypass_change_detection() = new_transform;
             }
         }else{
             let srt = jt.affine.to_scale_rotation_translation();
             let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
 
             if new_transform.is_finite(){
-                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0.bypass_change_detection() = new_transform;
             }
         }
     }
 
-    for (entity, (_, jt)) in joint_bookkeeper.ends.write().unwrap().iter() {
-        let maybe_parent = parents_q.get(*entity);
-        
-        if let Ok(parent) = maybe_parent{
-            
-            let new_gt = transforms_param_set.p1().compute_global_transform(parent.0).unwrap();
-            let new_affine = new_gt.affine().inverse();
-            let final_affine = new_affine * jt.affine;
-            let srt = final_affine.to_scale_rotation_translation();
-
-            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
-
-            if new_transform.is_finite(){
-                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
-            }
-        }else{
-            let srt = jt.affine.to_scale_rotation_translation();
-            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
-
-            if new_transform.is_finite(){
-                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
-            }
-        }
-    }
-
-
-    for (entity, (_, jt)) in joint_bookkeeper.bases.write().unwrap().iter() {
-        let maybe_parent = parents_q.get(*entity);
-        
-        if let Ok(parent) = maybe_parent{
-            
-            let new_gt = transforms_param_set.p1().compute_global_transform(parent.0).unwrap();
-            let new_affine = new_gt.affine().inverse();
-            let final_affine = new_affine * jt.affine;
-            let srt = final_affine.to_scale_rotation_translation();
-
-            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
-
-            if new_transform.is_finite(){
-                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
-            }
-        }else{
-            let srt = jt.affine.to_scale_rotation_translation();
-            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
-
-            if new_transform.is_finite(){
-                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
-            }
-        }
-    }
+    
     
         
     

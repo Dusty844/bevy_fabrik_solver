@@ -4,9 +4,11 @@ use bevy::{
     platform::collections::HashMap,
 };
 use std::sync::{Arc, Mutex, RwLock};
-use forte::ThreadPool;
+
 
 mod solver;
+
+mod constraint;
 
 mod bookkeeper;
 
@@ -14,10 +16,10 @@ pub struct IkSolverPlugin;
 
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
-        POOL.resize_to_available();
+        
         
         #[cfg(feature = "bevy_reflect")]
-        app.register_type::<(Joint, JointParent, JointChildren, JointTransform, Base, BaseJoint, EndEffector, EEJoint, IkGlobalSettings)>();
+        app.register_type::<(Joint, JointParent, JointChildren, JointTransform, Base, BaseJoint, EndEffector, EEJoint, IkGlobalSettings, constraint::Constraint)>();
         
         app.add_systems(PreStartup, bookkeeper::joint_hooks);
         
@@ -67,6 +69,7 @@ impl Default for IkGlobalSettings{
 #[require(Transform, JointTransform)]
 pub struct Joint{
     pub length: f32,
+    pub offset: Vec3,
     pub halfway: bool,
 }
 
@@ -104,9 +107,7 @@ pub struct EndEffector{
 #[derive(Component, Clone, Copy, Debug)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(Joint)]
-pub struct EEJoint{
-    pub ee: Entity,
-}
+pub struct EEJoint(pub Entity);
 
 #[derive(Component, Clone, Copy, Debug)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -141,4 +142,4 @@ impl Default for JointBookkeeping{
 }
 
 
-pub static POOL: ThreadPool = ThreadPool::new();
+
