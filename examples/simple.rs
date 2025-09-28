@@ -33,22 +33,21 @@ fn setup(
         Transform::IDENTITY.looking_at(Vec3::new(-0.2, -8.0, 0.1), Dir3::Y),
     ));
     let joint_length = 0.1;
+    let joint = Joint{
+        length: joint_length,
+        offset: Vec3::ZERO,
+        halfway: false,
+    };
 
     let joint = commands.spawn((
         Name::new("BaseJoint"),
-        Joint{
-            length: joint_length,
-            halfway: false
-        },
+        joint,
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.0, 0.0),
         children![(
             Name::new("Joint"),
-            Joint{
-                length: joint_length,
-                halfway: false
-            },
+            joint,
             Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(0.0, joint_length, 0.0),
@@ -58,7 +57,7 @@ fn setup(
     commands.spawn((
         Name::new("Base"),
         Base(joint),
-        Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
+        Mesh3d(meshes.add(Sphere::new(joint_length * 0.3))),
         MeshMaterial3d(materials.add(Color::srgb_u8(200, 144, 255))),
         Transform::from_xyz(0.0, 1.0, 0.0),
     ));

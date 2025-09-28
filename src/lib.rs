@@ -12,6 +12,8 @@ mod constraint;
 
 mod bookkeeper;
 
+mod utils;
+
 pub struct IkSolverPlugin;
 
 impl Plugin for IkSolverPlugin{
@@ -19,7 +21,7 @@ impl Plugin for IkSolverPlugin{
         
         
         #[cfg(feature = "bevy_reflect")]
-        app.register_type::<(Joint, JointParent, JointChildren, JointTransform, Base, BaseJoint, EndEffector, EEJoint, IkGlobalSettings, constraint::Constraint)>();
+        app.register_type::<(Joint, JointParent, JointChildren, JointTransform, Base, BaseJoint, EndEffector, EEJoint, IkGlobalSettings, constraint::RotationConstraint)>();
         
         app.add_systems(PreStartup, bookkeeper::joint_hooks);
         
