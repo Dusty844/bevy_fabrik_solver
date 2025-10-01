@@ -18,11 +18,7 @@ pub struct IkSolverPlugin;
 
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
-        
-        
-        #[cfg(feature = "bevy_reflect")]
-        app.register_type::<(Joint, JointParent, JointChildren, JointTransform, Base, BaseJoint, EndEffector, EEJoint, IkGlobalSettings, constraint::RotationConstraint)>();
-        
+       
         app.add_systems(PreStartup, bookkeeper::joint_hooks);
         
         app.add_systems(PostUpdate, (
@@ -30,7 +26,7 @@ impl Plugin for IkSolverPlugin{
             bookkeeper::bookkeep_joints_start,
             solver::solve,
             bookkeeper::sync_transforms,
-        ).chain().before(TransformSystem::TransformPropagate));
+        ).chain().before(TransformSystems::Propagate));
         
         app.insert_resource(IkGlobalSettings::default());
         app.insert_resource(JointBookkeeping::default());

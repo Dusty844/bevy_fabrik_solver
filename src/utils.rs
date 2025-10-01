@@ -122,3 +122,65 @@ impl QuatExtra for Quat{
         
     }
 }
+
+// courtesy of Daniel Holden:
+// https://theorangeduck.com/page/quaternion-weighted-average
+
+pub fn accurate_quat_average(
+    quats: &Vec<Quat>,
+    weights: &Vec<f32>,
+    quality_count: usize,
+    start_quat: Quat,
+)-> Quat {
+    let mut accum = Mat4::ZERO;
+
+    for (i, q) in quats.iter().enumerate() {
+        // assumes that quats are xyzw instead of wxyz.. i hope
+        accum += weights[i] * mat4(
+            vec4(q.x * q.w, q.x * q.x, q.x * q.y, q.x * q.z),
+            vec4(q.y * q.w, q.y * q.x, q.y * q.y, q.y * q.z),
+            vec4(q.z * q.w, q.z * q.x, q.z * q.y, q.z * q.z),
+            vec4(q.w * q.w, q.w * q.x, q.w * q.y, q.w * q.z)
+        );  
+    }
+    let u = svd_dominant_eigen(accum, start_quat.into(), quality_count, 0.0001);
+    let v = (accum * u).normalize();
+
+    quat_abs(quat(v.x, v.y, v.z, v.w))
+}
+
+fn svd_dominant_eigen(
+    a: Mat4,
+    v0: Vec4,
+    iterations: usize,
+    epsilon: f32,
+) -> Vec4{
+    let mut v = v0;
+    let mut ev = ((a * v) / v).x;
+
+    for i in 0..iterations {
+
+        
+        let av = a * v;
+
+        let v_new = av.normalize();
+        let ev_new = ((a * v_new) / v_new).x;
+
+        if f32::abs(ev - ev_new) < epsilon{
+            break;
+        }
+        v = v_new;
+        ev = ev_new;
+    }
+
+    v
+}
+
+
+fn quat_abs(a: Quat) -> Quat {
+        if a.w.is_sign_negative() {
+            -a
+        }else {
+            a
+        }
+    }
