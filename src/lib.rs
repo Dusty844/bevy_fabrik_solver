@@ -40,23 +40,14 @@ impl Plugin for IkSolverPlugin{
 pub struct IkGlobalSettings{
     pub iterations: usize,
     pub minimum_tolerance: f32,
-    pub solver_mode: GlobalRotationMode
 }
 
-#[derive(Default, Debug, Clone, Copy, Reflect)]
-pub enum GlobalRotationMode{
-    #[default]
-    DuringSolver,
-    AfterSolver,
-    Both,
-}
 
 impl Default for IkGlobalSettings{
     fn default() -> Self {
         Self{
             iterations: 10,
             minimum_tolerance: 0.002,
-            solver_mode: GlobalRotationMode::DuringSolver,
         }
     }
 }
