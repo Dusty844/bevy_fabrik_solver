@@ -116,9 +116,9 @@ pub fn collect_joint_transforms(
 #[allow(clippy::type_complexity)]
 pub fn bookkeep_joints_start(
     joint_bookkeeper: Res<JointBookkeeping>,
-    joints_q: Query<(&Joint, &JointTransform, Entity), Or<(Added<Joint>, Changed<Joint>, Changed<JointTransform>)>>,
-    end_effectors_q: Query<(&EndEffector, &JointTransform, Entity), Or<(Added<EndEffector>, Changed<EndEffector>, Changed<JointTransform>)>>,
-    bases_q: Query<(&Base, &JointTransform, Entity), Or<(Added<Base>, Changed<Base>, Changed<JointTransform>)>>,
+    joints_q: Query<(&Joint, &JointTransform, Entity)>,
+    end_effectors_q: Query<(&EndEffector, &JointTransform, Entity)>,
+    bases_q: Query<(&Base, &JointTransform, Entity)>,
     parent_setup: Query<(Entity, &ChildOf), Added<Joint>>,
     mut commands: Commands,
 ){
@@ -147,6 +147,7 @@ pub fn sync_transforms(
         Query<(&mut Transform, Option<&ChildOf>), With<JointTransform>>,
         TransformHelper,
     )>,
+    mut joints_q: Query<&mut JointTransform>,
     parents_q: Query<&ChildOf, With<JointTransform>>,
 ) {
 
@@ -157,6 +158,7 @@ pub fn sync_transforms(
     
     for (entity, (_, jt)) in joint_bookkeeper.joints.lock().unwrap().iter() {
         let maybe_parent = parents_q.get(*entity);
+        joints_q.get_mut(*entity).unwrap().affine = jt.affine;
         
         if let Ok(parent) = maybe_parent{
             
@@ -175,7 +177,7 @@ pub fn sync_transforms(
             let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
 
             if new_transform.is_finite(){
-                *transforms_param_set.p0().get_mut(*entity).unwrap().0.bypass_change_detection() = new_transform;
+                *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
             }
         }
     }

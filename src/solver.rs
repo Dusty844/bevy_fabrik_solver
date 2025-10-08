@@ -52,12 +52,6 @@ fn forward_reach(
             let mut ee_c: usize = 0;
             let mut children_c = 0;
             let p_i1 = Arc::new(Mutex::new(Vec3A::ZERO));
-            let mut p_i = if main_joint.halfway {
-                main_affine.translation
-                    - (main_affine.to_scale_rotation_translation().1 * Vec3A::Y * 0.5)
-            } else {
-                main_affine.translation
-            };
             let rots: Arc<Mutex<Vec<Quat>>> = Arc::new(Mutex::new(Vec::new()));
             let weigths: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
             let mut w_o = 1.0;
@@ -134,6 +128,7 @@ fn forward_reach(
                 } else {
                     ee_affine.translation
                 };
+                println!("ee joint: {:?}", ee_affine.translation);
 
                 rots.lock().unwrap().push(rot);
                 weigths.lock().unwrap().push(w_o);
@@ -152,7 +147,7 @@ fn forward_reach(
                 main_affine.to_scale_rotation_translation().1,
             );
 
-            p_i = if main_joint.halfway {
+            let mut p_i = if main_joint.halfway {
                 *p_i1.lock().unwrap() - (final_rot * Vec3A::Y * main_joint.length * 0.5)
             } else {
                 *p_i1.lock().unwrap() - (final_rot * Vec3A::Y * main_joint.length)
@@ -196,6 +191,7 @@ fn backward_reach(
     hierarchy_q: Query<(Entity, AnyOf<(&JointParent, &JointChildren)>)>,
     constraint_q: Query<&RotationConstraint, With<Joint>>,
 ) {
+    println!("back started");
     let mut current: Vec<Entity> = vec![];
     let seen = Arc::new(RwLock::new(EntityHashSet::new()));
     for (main_entity, base_joint) in bottom_joints.iter() {
