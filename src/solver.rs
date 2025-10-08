@@ -1,6 +1,6 @@
 use super::{
     Base, BaseJoint, EEJoint, EndEffector, Joint, JointBookkeeping, JointChildren, JointParent,
-    JointTransform, IkGlobalSettings,
+    JointTransform, IkGlobalSettings, RotationConstraint
 };
 
 use crate::constraint::*;
@@ -37,6 +37,7 @@ fn forward_reach(
     effector_joints: Query<(Entity, &EEJoint)>, //includes effector joints that are not at the end of any chain
     constraint_q: Query<&RotationConstraint, With<Joint>>,
 ) {
+    println!("front started");
     //is cloning really the best choice? ill have to benchmark at some point
     let mut current: Vec<Entity> = top_joints.into_iter().collect();
     let seen = Arc::new(RwLock::new(EntityHashSet::new()));
@@ -144,7 +145,7 @@ fn forward_reach(
             //let final_rot = rotation_averaging(&rots.lock().unwrap(), 5, main_affine.to_scale_rotation_translation().1);
 
             //new
-            let final_rot = accurate_quat_average(
+            let final_rot = rotation_averaging(
                 &rots.lock().unwrap(),
                 &weigths.lock().unwrap(),
                 5,
@@ -171,12 +172,14 @@ fn forward_reach(
 
             let new_affine =
                 Affine3A::from_rotation_translation(final_rot, final_translation.into());
-
+            println!("Joint {:?} set", *main_entity);
             bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1.affine = new_affine;
         });
         {
+            println!("cleared and new pushed");
             current.clear();
             let mut next_lock = next.lock().unwrap();
+            println!("next length: {:?}", next_lock.len());
             current.append(&mut next_lock);
         }
 
@@ -284,32 +287,4 @@ fn backward_reach(
             break;
         }
     }
-}
-
-fn rotation_averaging(quats: &Vec<Quat>, quality_count: usize, start_quat: Quat) -> Quat {
-    let mut a = [[0.0; 4]; 4];
-    for quat in quats {
-        for i in 0..4 {
-            for j in 0..4 {
-                a[i][j] += quat.to_array()[i] * quat.to_array()[j];
-            }
-        }
-    }
-
-    let mut final_rot = start_quat.normalize();
-
-    //higher the count, the better the approximation, when testing without a start quaternion
-    for _ in 0..quality_count {
-        let mut av = [0.0; 4];
-        for i in 0..4 {
-            for j in 0..4 {
-                av[i] += a[i][j] * final_rot.to_array()[j]
-            }
-        }
-        final_rot = Quat::from_array(av).normalize();
-    }
-    if final_rot.x < 0.0 {
-        final_rot *= Quat::from_slice(&[-1.0; 4]);
-    }
-    final_rot
 }

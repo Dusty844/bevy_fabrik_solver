@@ -14,6 +14,7 @@ mod bookkeeper;
 
 mod utils;
 
+
 pub struct IkSolverPlugin;
 
 impl Plugin for IkSolverPlugin{
@@ -37,6 +38,7 @@ impl Plugin for IkSolverPlugin{
 
 #[derive(Resource, Clone, Copy, Debug)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "bevy_reflect", reflect(Resource))]
 pub struct IkGlobalSettings{
     pub iterations: usize,
     pub minimum_tolerance: f32,
@@ -132,3 +134,48 @@ impl Default for JointBookkeeping{
 
 
 
+#[derive(Component, Copy, Clone, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+pub struct RotationConstraint{
+    pub identity: Quat,
+    pub other_weight: f32,
+    pub split_dir: Dir3,
+    pub twist: RangeVec3,
+    pub swing: RangeVec3,
+}
+
+impl Default for RotationConstraint {
+    fn default() -> Self {
+        let min = Vec3::splat(-0.75);
+        let max = Vec3::splat(0.75);
+        Self{
+            identity: Quat::IDENTITY,
+            other_weight: 0.5,
+            split_dir: Dir3::Y,
+            twist: RangeVec3::new(min, max),
+            swing: RangeVec3::new(min, max),
+        }
+    }
+}
+//would be more effective to switch to single axes twist two axes swing but i havent figured out the maths for that yet.
+
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+pub struct RangeVec3{
+    min: Vec3,
+    max: Vec3,
+}
+impl Default for RangeVec3 {
+    fn default() -> Self {
+        Self{
+            min: Vec3::MIN,
+            max: Vec3::MAX,
+        }
+    }
+}
+
+impl RangeVec3 {
+    fn new(min: Vec3, max:Vec3) -> RangeVec3 {
+        RangeVec3 { min, max }
+    }
+}

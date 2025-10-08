@@ -43,6 +43,28 @@ pub fn joint_hooks(
             }
         );
 
+    world.register_component_hooks::<EEJoint>()
+        .on_add(|mut world, context|{
+            let joint = world.get::<EEJoint>(context.entity).unwrap().0;
+            world.commands().entity(joint).insert(
+                EndEffector{
+                    joint: context.entity,
+                    joint_center: false,
+                    joint_copy_rotation: false,
+                });
+            //handles only insertion of basejoint
+        
+        })
+        .on_remove(
+            |mut world, context|{
+                
+                let end = world.get::<EEJoint>(context.entity).unwrap().0;
+                
+                
+                world.commands().entity(end).try_remove::<EndEffector>();
+            }
+        );
+
 
     //same as above
     world.register_component_hooks::<Base>()
@@ -58,6 +80,25 @@ pub fn joint_hooks(
             world.commands().entity(base.0).try_remove::<BaseJoint>();
         }
     );
+
+    world.register_component_hooks::<BaseJoint>()
+        .on_add(|mut world, context|{
+            let joint = world.get::<BaseJoint>(context.entity).unwrap().0;
+            world.commands().entity(joint).insert(
+                Base(context.entity));
+            //handles only insertion of basejoint
+        
+        })
+        .on_remove(
+            |mut world, context|{
+                
+                let base = world.get::<BaseJoint>(context.entity).unwrap().0;
+                
+                
+                world.commands().entity(base).try_remove::<Base>();
+            }
+        );
+
     
 }
 
