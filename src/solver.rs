@@ -37,7 +37,7 @@ fn forward_reach(
     effector_joints: Query<(Entity, &EEJoint)>, //includes effector joints that are not at the end of any chain
     constraint_q: Query<&RotationConstraint, With<Joint>>,
 ) {
-    println!("front started");
+    
     //is cloning really the best choice? ill have to benchmark at some point
     let mut current: Vec<Entity> = top_joints.into_iter().collect();
     let seen = Arc::new(RwLock::new(EntityHashSet::new()));
@@ -52,11 +52,13 @@ fn forward_reach(
             let mut ee_c: usize = 0;
             let mut children_c = 0;
             let p_i1 = Arc::new(Mutex::new(Vec3A::ZERO));
-            let rots: Arc<Mutex<Vec<Quat>>> = Arc::new(Mutex::new(Vec::new()));
-            let weigths: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
-            let mut w_o = 1.0;
+            let rots: Arc<Mutex<Vec<Quat>>> = Arc::new(Mutex::new(vec![main_affine.to_scale_rotation_translation().1]));
+            let weights: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
+            
             if let Ok(constraint) = constraint_q.get(*main_entity) {
-                w_o = constraint.other_weight.clamp(0.0, 1.0);
+                weights.lock().unwrap().push(constraint.weight);
+            } else {
+                weights.lock().unwrap().push(1.0);
             }
 
             if let Ok((_, (parent_maybe, child_maybe))) = hierarchy_q.get(*main_entity) {
@@ -81,38 +83,23 @@ fn forward_reach(
                         } else {
                             child_affine.translation + offset
                         };
-                        let rot = if let Ok(constraint) = constraint_q.get(*main_entity) {
-                            constrain_forward(child_affine, main_affine, *constraint)
+                        let (rot, weight) = if let Ok(constraint) = constraint_q.get(*main_entity) {
+                            (constrain_forward(child_affine, main_affine, *constraint), constraint.weight)
                         } else {
-                            child_affine.to_scale_rotation_translation().1
+                            (child_affine.to_scale_rotation_translation().1, 1.0)
                         };
 
                         rots.lock().unwrap().push(rot);
-                        weigths.lock().unwrap().push(w_o);
+                        weights.lock().unwrap().push(weight);
                         *p_i1.lock().unwrap() += bottom_point;
                     });
                 }
                 if let Some(parent) = parent_maybe
                     && !seen.read().unwrap().contains(&parent.0)
                 {
-                    //this part is experimental for now, not sure if it will be any good or not
-                    if let Ok(constraint) = constraint_q.get(*main_entity) {
-                        let parent_affine =
-                            bk.joints.lock().unwrap().get(&parent.0).unwrap().1.affine;
-                        let main = constrain_forward(main_affine, parent_affine, *constraint);
-                        rots.lock().unwrap().push(main);
-                    } else {
-                        rots.lock().unwrap().push(main_affine.to_scale_rotation_translation().1);
-                    }
-                    weigths.lock().unwrap().push(1.0);
-
                     next.lock().unwrap().push(parent.0);
-                } else {
-                    //if things above don't work out, this will be applied everywhere.
-                    rots.lock().unwrap().push(main_affine.to_scale_rotation_translation().1);
-                    weigths.lock().unwrap().push(1.0);
                 }
-            }
+            }            
 
             if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {
                 ee_c = 1;
@@ -128,10 +115,10 @@ fn forward_reach(
                 } else {
                     ee_affine.translation
                 };
-                println!("ee joint: {:?}", ee_affine.translation);
+                
 
                 rots.lock().unwrap().push(rot);
-                weigths.lock().unwrap().push(w_o);
+                weights.lock().unwrap().push(1.0); //weight for end effectors?
                 *p_i1.lock().unwrap() += bottom_point;
             }
             *p_i1.lock().unwrap() /= (ee_c + children_c) as f32;
@@ -142,7 +129,7 @@ fn forward_reach(
             //new
             let final_rot = rotation_averaging(
                 &rots.lock().unwrap(),
-                &weigths.lock().unwrap(),
+                &weights.lock().unwrap(),
                 5,
                 main_affine.to_scale_rotation_translation().1,
             );
@@ -167,14 +154,11 @@ fn forward_reach(
 
             let new_affine =
                 Affine3A::from_rotation_translation(final_rot, final_translation.into());
-            println!("Joint {:?} set", *main_entity);
             bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1.affine = new_affine;
         });
         {
-            println!("cleared and new pushed");
             current.clear();
             let mut next_lock = next.lock().unwrap();
-            println!("next length: {:?}", next_lock.len());
             current.append(&mut next_lock);
         }
 
@@ -191,7 +175,6 @@ fn backward_reach(
     hierarchy_q: Query<(Entity, AnyOf<(&JointParent, &JointChildren)>)>,
     constraint_q: Query<&RotationConstraint, With<Joint>>,
 ) {
-    println!("back started");
     let mut current: Vec<Entity> = vec![];
     let seen = Arc::new(RwLock::new(EntityHashSet::new()));
     for (main_entity, base_joint) in bottom_joints.iter() {

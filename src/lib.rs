@@ -138,7 +138,7 @@ impl Default for JointBookkeeping{
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct RotationConstraint{
     pub identity: Quat,
-    pub other_weight: f32,
+    pub weight: f32,
     pub split_dir: Dir3,
     pub twist: RangeVec3,
     pub swing: RangeVec3,
@@ -150,7 +150,7 @@ impl Default for RotationConstraint {
         let max = Vec3::splat(0.75);
         Self{
             identity: Quat::IDENTITY,
-            other_weight: 0.5,
+            weight: 1.0,
             split_dir: Dir3::Y,
             twist: RangeVec3::new(min, max),
             swing: RangeVec3::new(min, max),
