@@ -162,7 +162,7 @@ fn forward_reach(
             current.append(&mut next_lock);
         }
 
-        // current.append(other);
+        
         if current.is_empty() {
             break;
         }
@@ -178,25 +178,47 @@ fn backward_reach(
     let mut current: Vec<Entity> = vec![];
     let seen = Arc::new(RwLock::new(EntityHashSet::new()));
     for (main_entity, base_joint) in bottom_joints.iter() {
-        let main_joint = bk.joints.lock().unwrap().get(&main_entity).unwrap().0;
-        let mut main_affine = bk.joints.lock().unwrap().get(&main_entity).unwrap().1.affine;
-        let base_affine = bk.bases.read().unwrap().get(&base_joint.0).unwrap().1.affine;
-        main_affine.translation = if main_joint.halfway {
-            base_affine.translation + (main_affine.local_y() * main_joint.length * 0.5) +
-                (main_affine.to_scale_rotation_translation().1 * main_joint.offset).to_vec3a()
-        } else {
-            base_affine.translation + (main_affine.to_scale_rotation_translation().1 * main_joint.offset).to_vec3a()
-        };
-        bk.joints.lock().unwrap().get_mut(&main_entity).unwrap().1.affine = main_affine;
-        seen.write().unwrap().insert(main_entity);
-
         if let Ok((_, (parent_maybe, child_maybe))) = hierarchy_q.get(main_entity) {
             if let Some(children) = child_maybe {
+                let main_joint = bk.joints.lock().unwrap().get(&main_entity).unwrap().0;
+                let main_affine = bk.joints.lock().unwrap().get(&main_entity).unwrap().1.affine;
+                let base_affine = bk.bases.read().unwrap().get(&base_joint.0).unwrap().1.affine;
+                let bottom_point = base_affine.translation;
+                let mut top_point = Vec3A::ZERO;
                 for entity in children.0.iter() {
+                    let child_joint = bk.joints.lock().unwrap().get(entity).unwrap().0;
+                    let child_affine = bk.joints.lock().unwrap().get(entity).unwrap().1.affine;
+                    top_point += if child_joint.halfway{
+                        child_affine.translation - (child_affine.local_y() * child_joint.length * 0.5)
+                    } else {
+                        child_affine.translation
+                    };
                     if seen.read().unwrap().get(entity).is_none() {
                         current.push(*entity);
                     }
                 }
+                top_point /= children.0.len() as f32;
+
+                let r_i = (top_point - bottom_point).length();
+
+                let lambda = main_joint.length / r_i;
+
+                let p_i1 = (1.0 - lambda) * bottom_point + lambda * top_point;
+                let dir = (p_i1 - bottom_point).normalize();
+
+                let new_translation = if main_joint.halfway {
+                    p_i1 - (dir * main_joint.length * 0.5)  
+                } else {
+                    p_i1 - (dir * main_joint.length)
+                };
+                let local_z = main_affine.local_z();
+
+                let mut new_affine = main_affine.aligned_by(Dir3::Y, dir.to_vec3(), Dir3::Z, local_z);
+
+                new_affine.translation = new_translation;
+
+                bk.joints.lock().unwrap().get_mut(&main_entity).unwrap().1.affine = new_affine;
+                seen.write().unwrap().insert(main_entity);
             }
         }
     }
