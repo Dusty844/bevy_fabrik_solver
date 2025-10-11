@@ -47,12 +47,12 @@ fn forward_reach(
 
         current.par_iter().for_each(|main_entity| {
             seen.write().unwrap().insert(*main_entity);
-            let main_affine = bk.joints.lock().unwrap().get(main_entity).unwrap().1.affine;
+            let main_transform = bk.joints.lock().unwrap().get(main_entity).unwrap().1;
             let main_joint = bk.joints.lock().unwrap().get(main_entity).unwrap().0;
             let mut ee_c: usize = 0;
             let mut children_c = 0;
-            let p_i1 = Arc::new(Mutex::new(Vec3A::ZERO));
-            let rots: Arc<Mutex<Vec<Quat>>> = Arc::new(Mutex::new(vec![main_affine.to_scale_rotation_translation().1]));
+            let p_i1 = Arc::new(Mutex::new(Vec3::ZERO));
+            let rots: Arc<Mutex<Vec<Quat>>> = Arc::new(Mutex::new(vec![main_transform.rotation]));
             let weights: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
             
             if let Ok(constraint) = constraint_q.get(*main_entity) {
@@ -67,26 +67,26 @@ fn forward_reach(
 
                     //should i par iter? why not?
                     children.0.par_iter().for_each(|child| {
-                        let child_affine = bk.joints.lock().unwrap().get(child).unwrap().1.affine;
+                        let child_transform = bk.joints.lock().unwrap().get(child).unwrap().1;
                         let child_joint = bk.joints.lock().unwrap().get(child).unwrap().0;
 
                         //offset needs to be based off the child, not the parent in this case
-                        let offset = Vec3A::from(
-                            child_affine.to_scale_rotation_translation().1 * child_joint.offset,
+                        let offset = Vec3::from(
+                            child_transform.rotation * child_joint.offset,
                         );
 
                         let bottom_point = if child_joint.halfway {
                             //need to reimpl the utils functions
-                            child_affine.translation
-                                - (child_affine.local_y().as_vec3a() * child_joint.length * 0.5)
+                            child_transform.translation
+                                - (child_transform.local_y() * child_joint.length * 0.5)
                                 + offset
                         } else {
-                            child_affine.translation + offset
+                            child_transform.translation + offset
                         };
                         let (rot, weight) = if let Ok(constraint) = constraint_q.get(*main_entity) {
-                            (constrain_forward(child_affine, main_affine, *constraint), constraint.weight)
+                            (constrain_forward(child_transform, main_transform, *constraint), constraint.weight)
                         } else {
-                            (child_affine.to_scale_rotation_translation().1, 1.0)
+                            (child_transform.rotation, 1.0)
                         };
 
                         rots.lock().unwrap().push(rot);
@@ -104,16 +104,16 @@ fn forward_reach(
             if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {
                 ee_c = 1;
                 let ee = bk.ends.read().unwrap().get(&ee_joint.0).unwrap().0;
-                let ee_affine = bk.ends.read().unwrap().get(&ee_joint.0).unwrap().1.affine;
+                let ee_transform = bk.ends.read().unwrap().get(&ee_joint.0).unwrap().1;
                 let rot = if ee.joint_copy_rotation {
-                    ee_affine.to_scale_rotation_translation().1
+                    ee_transform.rotation
                 } else {
-                    main_affine.to_scale_rotation_translation().1
+                    main_transform.rotation
                 };
                 let bottom_point = if ee.joint_center {
-                    ee_affine.translation + (rot * Vec3A::Y * main_joint.length * 0.5)
+                    ee_transform.translation + (rot * Vec3::Y * main_joint.length * 0.5)
                 } else {
-                    ee_affine.translation
+                    ee_transform.translation
                 };
                 
 
@@ -123,21 +123,18 @@ fn forward_reach(
             }
             *p_i1.lock().unwrap() /= (ee_c + children_c) as f32;
 
-            //old
-            //let final_rot = rotation_averaging(&rots.lock().unwrap(), 5, main_affine.to_scale_rotation_translation().1);
-
             //new
             let final_rot = rotation_averaging(
                 &rots.lock().unwrap(),
                 &weights.lock().unwrap(),
                 5,
-                main_affine.to_scale_rotation_translation().1,
+                main_transform.rotation,
             );
 
             let mut p_i = if main_joint.halfway {
-                *p_i1.lock().unwrap() - (final_rot * Vec3A::Y * main_joint.length * 0.5)
+                *p_i1.lock().unwrap() - (final_rot * Vec3::Y * main_joint.length * 0.5)
             } else {
-                *p_i1.lock().unwrap() - (final_rot * Vec3A::Y * main_joint.length)
+                *p_i1.lock().unwrap() - (final_rot * Vec3::Y * main_joint.length)
             };
 
             let r_i = (*p_i1.lock().unwrap() - p_i).length();
@@ -145,16 +142,20 @@ fn forward_reach(
             let lambda = main_joint.length / r_i;
 
             p_i = (1.0 - lambda) * *p_i1.lock().unwrap() + lambda * p_i;
+            let test_dir = (*p_i1.lock().unwrap() - p_i).normalize();
 
             let final_translation = if main_joint.halfway {
-                p_i + (final_rot * Vec3A::Y * main_joint.length * 0.5)
+                p_i + (final_rot * Vec3::Y * main_joint.length * 0.5)
             } else {
                 p_i
             };
+            let rot = Quat::from_rotation_arc(Vec3::Y, test_dir);
 
-            let new_affine =
-                Affine3A::from_rotation_translation(final_rot, final_translation.into());
-            bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1.affine = new_affine;
+            
+            bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1.translation = final_translation;
+            bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1.rotation = rot;
+                                
+            
         });
         {
             current.clear();
@@ -181,17 +182,17 @@ fn backward_reach(
         if let Ok((_, (parent_maybe, child_maybe))) = hierarchy_q.get(main_entity) {
             if let Some(children) = child_maybe {
                 let main_joint = bk.joints.lock().unwrap().get(&main_entity).unwrap().0;
-                let main_affine = bk.joints.lock().unwrap().get(&main_entity).unwrap().1.affine;
-                let base_affine = bk.bases.read().unwrap().get(&base_joint.0).unwrap().1.affine;
-                let bottom_point = base_affine.translation;
-                let mut top_point = Vec3A::ZERO;
+                let main_transform = bk.joints.lock().unwrap().get(&main_entity).unwrap().1;
+                let base_transform = bk.bases.read().unwrap().get(&base_joint.0).unwrap().1;
+                let bottom_point = base_transform.translation;
+                let mut top_point = Vec3::ZERO;
                 for entity in children.0.iter() {
                     let child_joint = bk.joints.lock().unwrap().get(entity).unwrap().0;
-                    let child_affine = bk.joints.lock().unwrap().get(entity).unwrap().1.affine;
+                    let child_transform = bk.joints.lock().unwrap().get(entity).unwrap().1;
                     top_point += if child_joint.halfway{
-                        child_affine.translation - (child_affine.local_y() * child_joint.length * 0.5)
+                        child_transform.translation - (child_transform.local_y() * child_joint.length * 0.5)
                     } else {
-                        child_affine.translation
+                        child_transform.translation
                     };
                     if seen.read().unwrap().get(entity).is_none() {
                         current.push(*entity);
@@ -211,13 +212,13 @@ fn backward_reach(
                 } else {
                     p_i1 - (dir * main_joint.length)
                 };
-                let local_z = main_affine.local_z();
+                let local_z = main_transform.local_z();
 
-                let mut new_affine = main_affine.aligned_by(Dir3::Y, dir.to_vec3(), Dir3::Z, local_z);
+                let mut new_affine = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z);
 
                 new_affine.translation = new_translation;
 
-                bk.joints.lock().unwrap().get_mut(&main_entity).unwrap().1.affine = new_affine;
+                bk.joints.lock().unwrap().get_mut(&main_entity).unwrap().1 = new_affine;
                 seen.write().unwrap().insert(main_entity);
             }
         }
@@ -227,25 +228,25 @@ fn backward_reach(
         let next: Arc<Mutex<Vec<Entity>>> = Arc::new(Mutex::new(Vec::new()));
 
         current.par_iter_mut().for_each(|main_entity| {
-            let main_affine = bk.joints.lock().unwrap().get(main_entity).unwrap().1.affine;
+            let main_transform = bk.joints.lock().unwrap().get(main_entity).unwrap().1;
             let main_joint = bk.joints.lock().unwrap().get(main_entity).unwrap().0;
 
             if let Ok((_, (parent_maybe, child_maybe))) = hierarchy_q.get(*main_entity) {
                 if let Some(parent) = parent_maybe {
-                    let parent_affine = bk.joints.lock().unwrap().get(&parent.0).unwrap().1.affine;
+                    let parent_transform = bk.joints.lock().unwrap().get(&parent.0).unwrap().1;
                     let parent_joint = bk.joints.lock().unwrap().get(&parent.0).unwrap().0;
 
                     let top_point = if main_joint.halfway {
-                        main_affine.translation + (main_affine.local_y() * main_joint.length * 0.5)
+                        main_transform.translation + (main_transform.local_y() * main_joint.length * 0.5)
                     } else {
-                        main_affine.translation + (main_affine.local_y() * main_joint.length)
+                        main_transform.translation + (main_transform.local_y() * main_joint.length)
                     };
 
                     let bottom_point = if parent_joint.halfway {
-                        parent_affine.translation + (parent_affine.local_y() * parent_joint.length * 0.5)
+                        parent_transform.translation + (parent_transform.local_y() * parent_joint.length * 0.5)
                     } else {
-                        parent_affine.translation + (parent_affine.local_y() * parent_joint.length)
-                    } + (parent_affine.to_scale_rotation_translation().1 * main_joint.offset.to_vec3a());
+                        parent_transform.translation + (parent_transform.local_y() * parent_joint.length)
+                    } + (parent_transform.rotation * main_joint.offset);
 
                     let r_i = (top_point - bottom_point).length();
 
@@ -259,13 +260,14 @@ fn backward_reach(
                     } else {
                         p_i1 - (dir * main_joint.length)
                     };
-                    let local_z = main_affine.local_z();
+                    let local_z = main_transform.local_z();
 
-                    let mut new_affine = main_affine.aligned_by(Dir3::Y, dir.to_vec3(), Dir3::Z, local_z);
+
+                    let mut new_affine = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z);
 
                     new_affine.translation = new_translation;
 
-                    bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1.affine = new_affine;
+                    bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1 = new_affine;
 
                 }
                 if let Some(children) = child_maybe {

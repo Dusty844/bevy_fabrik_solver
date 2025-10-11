@@ -2,16 +2,16 @@ use bevy::{math::Affine3A, prelude::*};
 
 use crate::utils::QuatExtra;
 
-use super::RotationConstraint;
+use super::{RotationConstraint, JointTransform};
 
 
 pub fn constrain_forward(
-    child_affine: Affine3A,
-    main_affine: Affine3A,
+    child_transform: JointTransform,
+    main_transform: JointTransform,
     constraint: RotationConstraint,
 ) -> Quat{
-    let parent = child_affine.to_scale_rotation_translation().1;
-    let theoretical = constraint.identity.conjugate() * (parent.conjugate() * main_affine.to_scale_rotation_translation().1);
+    let parent = child_transform.rotation;
+    let theoretical = constraint.identity.conjugate() * (parent.conjugate() * main_transform.rotation);
 
     let (mut twist, mut swing) = theoretical.twist_swing(constraint.split_dir.as_vec3());
 

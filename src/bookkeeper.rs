@@ -12,7 +12,7 @@ use super::{
     BaseJoint,
 };
 
-use bevy::prelude::*;
+use bevy::{math::Affine3A, prelude::*};
 
 
 
@@ -108,7 +108,10 @@ pub fn collect_joint_transforms(
         helper: TransformHelper,
 ){
     for (mut jt, entity) in transforms_q.iter_mut(){
-        jt.affine = helper.compute_global_transform(entity).unwrap().affine();
+        let srt = helper.compute_global_transform(entity).unwrap().to_scale_rotation_translation();
+        jt.scale = srt.0;
+        jt.rotation = srt.1;
+        jt.translation = srt.2;
     }
 }
 
@@ -158,13 +161,13 @@ pub fn sync_transforms(
     
     for (entity, (_, jt)) in joint_bookkeeper.joints.lock().unwrap().iter() {
         let maybe_parent = parents_q.get(*entity);
-        joints_q.get_mut(*entity).unwrap().affine = jt.affine;
+        *joints_q.get_mut(*entity).unwrap() = *jt;
         
         if let Ok(parent) = maybe_parent{
             
             let new_gt = transforms_param_set.p1().compute_global_transform(parent.0).unwrap();
             let new_affine = new_gt.affine().inverse();
-            let final_affine = new_affine * jt.affine;
+            let final_affine = new_affine * Affine3A::from_scale_rotation_translation(jt.scale, jt.rotation, jt.translation);
             let srt = final_affine.to_scale_rotation_translation();
 
             let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
@@ -173,9 +176,9 @@ pub fn sync_transforms(
                 *transforms_param_set.p0().get_mut(*entity).unwrap().0.bypass_change_detection() = new_transform;
             }
         }else{
-            let srt = jt.affine.to_scale_rotation_translation();
-            let new_transform = Transform::from_scale(srt.0).with_rotation(srt.1).with_translation(srt.2);
-
+            
+            let new_transform = Transform::from_scale(jt.scale).with_rotation(jt.rotation).with_translation(jt.translation);
+            
             if new_transform.is_finite(){
                 *transforms_param_set.p0().get_mut(*entity).unwrap().0 = new_transform;
             }

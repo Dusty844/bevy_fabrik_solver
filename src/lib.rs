@@ -83,7 +83,9 @@ pub struct JointChildren(Vec<Entity>);
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(Transform)]
 pub struct JointTransform{
-    affine: Affine3A,        
+    scale: Vec3,
+    rotation: Quat,
+    translation: Vec3,        
 }
 
 #[derive(Component, Clone, Copy, Debug)]

@@ -37,11 +37,14 @@ fn setup(
         length: joint_length,
         offset: Vec3::ZERO,
         halfway: true,
-    }, RotationConstraint{
+    }
+        ,
+        RotationConstraint{
             identity: Quat::IDENTITY,
             weight: 1.0,
             ..Default::default()
-        });
+        }
+    );
     
 
     let base = commands.spawn((
