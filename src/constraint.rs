@@ -6,12 +6,12 @@ use super::{RotationConstraint, JointTransform};
 
 
 pub fn constrain_forward(
-    child_transform: JointTransform,
-    main_transform: JointTransform,
+    child_rotation: Quat,
+    main_rotation: Quat,
     constraint: RotationConstraint,
 ) -> Quat{
-    let parent = child_transform.rotation;
-    let theoretical = constraint.identity.conjugate() * (parent.conjugate() * main_transform.rotation);
+    let parent = child_rotation;
+    let theoretical = constraint.identity.conjugate() * (parent.conjugate() * main_rotation);
 
     let (mut twist, mut swing) = theoretical.twist_swing(constraint.split_dir.as_vec3());
 

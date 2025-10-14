@@ -32,18 +32,18 @@ fn setup(
         },
         Transform::IDENTITY.looking_at(Vec3::new(-0.2, -8.0, 0.1), Dir3::Y),
     ));
-    let joint_length = 0.1;
+    let joint_length = 0.2;
     let joint = (Joint{
         length: joint_length,
         offset: Vec3::ZERO,
         halfway: true,
     }
         ,
-        RotationConstraint{
-            identity: Quat::IDENTITY,
-            weight: 1.0,
-            ..Default::default()
-        }
+        // RotationConstraint{
+        //     identity: Quat::IDENTITY,
+        //     weight: 1.0,
+        //     ..Default::default()
+        // }
     );
     
 
@@ -68,28 +68,28 @@ fn setup(
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.0, 0.0),
-        children![(
+        related!(JointChildren[(
             Name::new("Joint"),
             joint,
             Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(0.0, joint_length, 0.0),
-            children![(
+            related!(JointChildren[(
                 Name::new("Joint"),
                 joint,
                 Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                 MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                 Transform::from_xyz(0.0, joint_length, 0.0),
-                children![(
+                related!(JointChildren[(
                     Name::new("EndJoint"),
                     joint,
                     Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                     Transform::from_xyz(0.0, joint_length, 0.0),
                     EEJoint(end),
-                )]
-            )]
-        )]
+                )])
+            )])
+        )])
     ));
 
     
