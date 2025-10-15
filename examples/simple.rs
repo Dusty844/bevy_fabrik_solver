@@ -39,11 +39,11 @@ fn setup(
         halfway: true,
     }
         ,
-        // RotationConstraint{
-        //     identity: Quat::IDENTITY,
-        //     weight: 1.0,
-        //     ..Default::default()
-        // }
+        RotationConstraint{
+            identity: Quat::IDENTITY,
+            weight: 1.0,
+            ..Default::default()
+        }
     );
     
 

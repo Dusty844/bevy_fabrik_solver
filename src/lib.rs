@@ -1,6 +1,5 @@
 use bevy::{
     prelude::*,
-    math::Affine3A,
     platform::collections::HashMap,
 };
 use std::sync::{Arc, Mutex, RwLock};
@@ -49,7 +48,7 @@ impl Default for IkGlobalSettings{
     fn default() -> Self {
         Self{
             iterations: 10,
-            minimum_tolerance: 0.002,
+            minimum_tolerance: 0.00001,
         }
     }
 }
@@ -120,6 +119,7 @@ pub struct JointBookkeeping{
     pub children: Arc<RwLock<HashMap<Entity, JointChildren>>>,
     pub ends: Arc<RwLock<HashMap<Entity, (EndEffector, JointTransform)>>>,
     pub bases: Arc<RwLock<HashMap<Entity, (Base, JointTransform)>>>,
+    pub last_diff: Vec3,
 }
 
 impl Default for JointBookkeeping{
@@ -130,6 +130,7 @@ impl Default for JointBookkeeping{
             children: Arc::new(RwLock::new(HashMap::new())),
             ends: Arc::new(RwLock::new(HashMap::new())),
             bases: Arc::new(RwLock::new(HashMap::new())),
+            last_diff: Vec3::ZERO,
         }
     }
 }
@@ -177,7 +178,7 @@ impl Default for RangeVec3 {
 }
 
 impl RangeVec3 {
-    fn new(min: Vec3, max:Vec3) -> RangeVec3 {
+    pub fn new(min: Vec3, max:Vec3) -> RangeVec3 {
         RangeVec3 { min, max }
     }
 }

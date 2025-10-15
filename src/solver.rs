@@ -20,11 +20,17 @@ pub fn solve(
     mut effector_joints: Query<(Entity, &EEJoint)>,
     mut constraint_q: Query<&RotationConstraint, With<Joint>>,
 ) {
-    for _ in 0..global_joint_settings.iterations {
+    for x in 0..global_joint_settings.iterations {
         forward_reach(&mut bk, top_joints.reborrow(), hierarchy_q.reborrow(), effector_joints.reborrow(), constraint_q.reborrow());
 
-        backward_reach(&mut bk, bottom_joints.reborrow(), hierarchy_q.reborrow(), constraint_q.reborrow());
-        
+        let new_dist = backward_reach(&mut bk, bottom_joints.reborrow(), hierarchy_q.reborrow(), effector_joints.reborrow(), constraint_q.reborrow());
+        // println!("{:?}",bk.last_diff.distance(new_dist));
+        if bk.last_diff.distance(new_dist) < global_joint_settings.minimum_tolerance {
+            bk.last_diff = new_dist;
+            // println!("last iteration count: {:?}", x);
+            break;
+        }
+        bk.last_diff = new_dist;
     }
     
 }
@@ -193,10 +199,12 @@ fn backward_reach(
     bk: &mut JointBookkeeping,
     bottom_joints: Query<(Entity, &BaseJoint), (With<BaseJoint>, Without<JointParent>)>,
     hierarchy_q: Query<(Entity, AnyOf<(&JointParent, &JointChildren)>)>,
+    effector_joints: Query<(Entity, &EEJoint)>,
     constraint_q: Query<&RotationConstraint, With<Joint>>,
-) {
+) -> Vec3 {
     let mut current: Vec<Entity> = vec![];
     let seen = Arc::new(RwLock::new(EntityHashSet::new()));
+    let end_dists = Arc::new(Mutex::new(Vec3::ZERO));
     for (main_entity, base_joint) in bottom_joints.iter() {
         if let Ok((_, (parent_maybe, child_maybe))) = hierarchy_q.get(main_entity) {
             if let Some(children) = child_maybe {
@@ -231,6 +239,12 @@ fn backward_reach(
                 let mut new_transform = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z);
 
                 new_transform.translation = new_translation;
+
+                if let Ok((_, ee_joint)) = effector_joints.get(main_entity) {
+                    let (ee, ee_transform) = *bk.ends.read().unwrap().get(&ee_joint.0).unwrap();
+                    let dist = ee_transform.translation - new_transform.translation;
+                    *end_dists.lock().unwrap() += dist;
+                }
 
                 bk.joints.lock().unwrap().get_mut(&main_entity).unwrap().1 = new_transform;
                 seen.write().unwrap().insert(main_entity);
@@ -277,6 +291,13 @@ fn backward_reach(
 
                     new_transform.translation = new_translation;
 
+                    if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {
+                        let (ee, ee_transform) = *bk.ends.read().unwrap().get(&ee_joint.0).unwrap();
+                        let dist = ee_transform.translation - new_transform.translation;
+                        *end_dists.lock().unwrap() += dist;
+                    }
+                    
+
                     bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1 = new_transform;
 
                 }
@@ -300,4 +321,5 @@ fn backward_reach(
             break;
         }
     }
+    *end_dists.lock().unwrap()
 }
