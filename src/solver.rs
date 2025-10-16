@@ -264,7 +264,7 @@ fn backward_reach(
                     let parent_transform = bk.joints.lock().unwrap().get(&parent.0).unwrap().1;
                     let parent_joint = bk.joints.lock().unwrap().get(&parent.0).unwrap().0;
 
-                    let top_point = if main_joint.halfway {
+                    let initial_top_point = if main_joint.halfway {
                         main_transform.translation + (main_transform.local_y() * main_joint.length * 0.5)
                     } else {
                         main_transform.translation + (main_transform.local_y() * main_joint.length)
@@ -276,20 +276,43 @@ fn backward_reach(
                         parent_transform.translation + (parent_transform.local_y() * parent_joint.length)
                     } + (parent_transform.rotation * main_joint.offset);
 
-                    let dir = (top_point - bottom_point).normalize();
+                    let local_z = main_transform.local_z();
 
+                    
+                    let initial_dir = (initial_top_point - bottom_point).normalize();
+                    
+                    // let mut rot = main_transform.aligned_by(Dir3::Y, initial_dir, Dir3::Z, local_z).rotation;
+                    let mut rot = Quat::from_rotation_arc(Vec3::Y, initial_dir);
+                    let in_rot = rot;
+
+                    if let Ok(constraint) = constraint_q.get(*main_entity){
+                        rot = constrain_backward(rot, parent_transform.rotation, *constraint);
+                    }
+
+                    rot = rot.slerp(in_rot, 0.2);
+
+                    let top_point = bottom_point + (rot * Vec3::Y * main_joint.length);
+                    
+
+                    
+                    let dir = (top_point - bottom_point).normalize();
+                    
                     let new_translation = if main_joint.halfway {
                         bottom_point + (dir * main_joint.length * 0.5)  
                     } else {
                         bottom_point + (dir * main_joint.length)
                     };
 
-                    let local_z = main_transform.local_z();
+                    
 
 
-                    let mut new_transform = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z);
+                    // let mut new_transform = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z);
+                    let mut new_transform = main_transform;
+                    new_transform.rotation = rot;
 
                     new_transform.translation = new_translation;
+
+                    
 
                     if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {
                         let (ee, ee_transform) = *bk.ends.read().unwrap().get(&ee_joint.0).unwrap();

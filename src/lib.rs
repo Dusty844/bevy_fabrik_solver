@@ -87,6 +87,14 @@ pub struct JointTransform{
     translation: Vec3,        
 }
 
+impl JointTransform {
+    pub const IDENTITY: JointTransform = JointTransform{
+        scale: Vec3::ONE,
+        rotation: Quat::IDENTITY,
+        translation: Vec3::ZERO,
+    };
+}
+
 #[derive(Component, Clone, Copy, Debug)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(Transform, JointTransform)]

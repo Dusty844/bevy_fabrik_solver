@@ -32,18 +32,19 @@ fn setup(
         },
         Transform::IDENTITY.looking_at(Vec3::new(-0.2, -8.0, 0.1), Dir3::Y),
     ));
+
     let joint_length = 0.2;
     let joint = (Joint{
         length: joint_length,
         offset: Vec3::ZERO,
         halfway: true,
     }
-        ,
-        RotationConstraint{
-            identity: Quat::IDENTITY,
-            weight: 1.0,
-            ..Default::default()
-        }
+        // ,
+        // RotationConstraint{
+        //     identity: Quat::IDENTITY,
+        //     weight: 1.0,
+        //     ..Default::default()
+        // }
     );
     
 
@@ -101,8 +102,3 @@ fn setup(
        
 }
 
-fn after(
-    bk: Res<JointBookkeeping>,
-){
-    println!("{:#?}", bk.joints.lock().unwrap());
-}
