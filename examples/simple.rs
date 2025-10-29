@@ -18,8 +18,12 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut ik_settings: ResMut<IkGlobalSettings>,
     
 ){
+    //if you have a hierarchy of transforms, set this to true
+    ik_settings.force_global_transform = true;
+    
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(-0.5, 1.25, 3.0).looking_at(Vec3::ZERO, Dir3::Y),
@@ -69,25 +73,33 @@ fn setup(
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.0, 0.0),
-        related!(JointChildren[(
+        related!(Children[(
             Name::new("Joint"),
             joint,
             Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(0.0, joint_length, 0.0),
-            related!(JointChildren[(
+            related!(Children[(
                 Name::new("Joint"),
                 joint,
                 Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                 MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                 Transform::from_xyz(0.0, joint_length, 0.0),
-                related!(JointChildren[(
-                    Name::new("EndJoint"),
+                related!(Children[(
+                    Name::new("Joint"),
                     joint,
                     Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                     Transform::from_xyz(0.0, joint_length, 0.0),
-                    EEJoint(end),
+                    // EEJoint(end),
+                    related!(Children[(
+                        Name::new("EndJoint"),
+                        joint,
+                        Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
+                        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+                        Transform::from_xyz(0.0, joint_length, 0.0),
+                        EEJoint(end),
+                    )])
                 )])
             )])
         )])

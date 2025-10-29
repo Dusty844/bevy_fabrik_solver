@@ -22,8 +22,8 @@ pub fn constrain_forward(
     scaled_swing = scaled_swing.clamp(constraint.swing.min, constraint.swing.max);
 
         
-    twist = Quat::from_scaled_axis(scaled_twist);
-    swing = Quat::from_scaled_axis(scaled_swing);
+    twist = Quat::from_scaled_axis(scaled_twist).normalize();
+    swing = Quat::from_scaled_axis(scaled_swing).normalize();
 
     (twist * swing) * parent    
 
@@ -46,8 +46,8 @@ pub fn constrain_backward(
     scaled_swing = scaled_swing.clamp(constraint.swing.min, constraint.swing.max);
 
         
-    twist = Quat::from_scaled_axis(scaled_twist);
-    swing = Quat::from_scaled_axis(scaled_swing);
+    twist = Quat::from_scaled_axis(scaled_twist).normalize();
+    swing = Quat::from_scaled_axis(scaled_swing).normalize();
 
     (twist * swing) * parent
 }

@@ -27,6 +27,7 @@ impl Plugin for IkSolverPlugin{
             solver::solve,
             bookkeeper::sync_transforms,
         ).chain().before(TransformSystems::Propagate));
+        app.add_systems(PostUpdate, bookkeeper::force_gt.after(TransformSystems::Propagate));
         
         app.insert_resource(IkGlobalSettings::default());
         app.insert_resource(JointBookkeeping::default());
@@ -41,6 +42,7 @@ impl Plugin for IkSolverPlugin{
 pub struct IkGlobalSettings{
     pub iterations: usize,
     pub minimum_tolerance: f32,
+    pub force_global_transform: bool,
 }
 
 
@@ -49,7 +51,15 @@ impl Default for IkGlobalSettings{
         Self{
             iterations: 10,
             minimum_tolerance: 0.00001,
+            force_global_transform: false,
         }
+    }
+}
+impl IkGlobalSettings {
+    fn force_set_gt(mut self) -> IkGlobalSettings {
+        self.force_global_transform = true;
+        self
+        
     }
 }
 

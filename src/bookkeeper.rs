@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{JointChildren, JointParent};
+use crate::{IkGlobalSettings, JointChildren, JointParent};
 
 use super::{
     Joint,
@@ -189,5 +189,18 @@ pub fn sync_transforms(
     
         
     
+    
+}
+
+pub fn force_gt(
+    mut gt_joint_q: Query<(&mut GlobalTransform, &JointTransform)>,
+    global_settings: Res<IkGlobalSettings>,
+){
+    if global_settings.force_global_transform {
+        for (mut gt, joint) in gt_joint_q.iter_mut(){
+            let transform = Transform::from_scale(joint.scale).with_rotation(joint.rotation).with_translation(joint.translation);
+            *gt = GlobalTransform::from(transform);
+        }
+    }
     
 }
