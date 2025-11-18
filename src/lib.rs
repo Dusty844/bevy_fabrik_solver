@@ -55,13 +55,6 @@ impl Default for IkGlobalSettings{
         }
     }
 }
-impl IkGlobalSettings {
-    fn force_set_gt(mut self) -> IkGlobalSettings {
-        self.force_global_transform = true;
-        self
-        
-    }
-}
 
 
 #[derive(Component, Clone, Copy, Default, Debug)]
@@ -161,42 +154,21 @@ pub struct RotationConstraint{
     pub identity: Quat,
     pub weight: f32,
     pub split_dir: Dir3,
-    pub twist: RangeVec3,
-    pub swing: RangeVec3,
+    pub twist: f32,
+    pub swing: f32,
 }
 
 impl Default for RotationConstraint {
     fn default() -> Self {
-        let min = Vec3::splat(-0.75);
-        let max = Vec3::splat(0.75);
         Self{
             identity: Quat::IDENTITY,
             weight: 1.0,
             split_dir: Dir3::Y,
-            twist: RangeVec3::new(min, max),
-            swing: RangeVec3::new(min, max),
+            twist: 0.7853,
+            swing: 1.0471,
         }
     }
 }
 //would be more effective to switch to single axes twist two axes swing but i havent figured out the maths for that yet.
 
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-pub struct RangeVec3{
-    min: Vec3,
-    max: Vec3,
-}
-impl Default for RangeVec3 {
-    fn default() -> Self {
-        Self{
-            min: Vec3::MIN,
-            max: Vec3::MAX,
-        }
-    }
-}
 
-impl RangeVec3 {
-    pub fn new(min: Vec3, max:Vec3) -> RangeVec3 {
-        RangeVec3 { min, max }
-    }
-}

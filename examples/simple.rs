@@ -40,15 +40,15 @@ fn setup(
     let joint_length = 0.2;
     let joint = (Joint{
         length: joint_length,
-        offset: Vec3::ZERO,
+        offset: Vec3::Y * joint_length * 0.5,
         halfway: true,
     }
-        // ,
-        // RotationConstraint{
-        //     identity: Quat::IDENTITY,
-        //     weight: 1.0,
-        //     ..Default::default()
-        // }
+        ,
+        RotationConstraint{
+            identity: Quat::IDENTITY,
+            weight: 1.0,
+            ..Default::default()
+        }
     );
     
 

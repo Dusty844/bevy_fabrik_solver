@@ -1,6 +1,6 @@
-use std::sync::Arc;
 
-use crate::{IkGlobalSettings, JointChildren, JointParent};
+
+use crate::{IkGlobalSettings, JointParent};
 
 use super::{
     Joint,
