@@ -74,9 +74,10 @@ fn forward_reach(
                         
 
                         let dir = (child_bottom_point - initial_bottom_point).normalize();
-                        let in_rot = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z).rotation;
+                        let in_rot = Quat::from_rotation_arc(Vec3::Y, dir);
                         let (rot, weight) = if let Ok(constraint) = constraint_q.get(*child) {
                             (constrain_forward(child_transform.rotation, in_rot, *constraint), constraint.weight)
+                            // (in_rot, 1.0)
                         } else {
                             (in_rot, 1.0)
                         };
@@ -103,7 +104,7 @@ fn forward_reach(
                     (ee_transform.rotation, ee_transform.translation)    
                 }else{
                     let dir = (ee_transform.translation - initial_bottom_point).normalize();
-                    let new = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z).rotation;
+                    let new = Quat::from_rotation_arc(Vec3::Y, dir);
                     (new, ee_transform.translation)        
                 };
                 
@@ -129,13 +130,12 @@ fn forward_reach(
 
             let new_bottom_point = new_top_point - (final_rot * Vec3::Y * main_joint.length);
 
-            let dir = (new_top_point - new_bottom_point).normalize();
 
-            let rot = main_transform.aligned_by(Dir3::Y, dir, Dir3::Z, local_z).rotation;
+            
 
             let final_translation = new_bottom_point + (final_rot * main_joint.offset);
             main_transform.translation = final_translation;
-            main_transform.rotation = rot;
+            main_transform.rotation = final_rot;
 
             bk.joints.lock().unwrap().get_mut(main_entity).unwrap().1 = main_transform;
             
