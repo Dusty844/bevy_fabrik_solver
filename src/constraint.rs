@@ -1,33 +1,24 @@
 use bevy::prelude::*;
-
-use crate::utils::QuatExtra;
-
 use super::{RotationConstraint};
 
 
-pub fn constrain_forward(
-    child_rotation: Quat,
-    main_rotation: Quat,
-    constraint: RotationConstraint,
-) -> Quat{
-    let parent = child_rotation;
-    let theoretical = parent.conjugate() * constraint.identity.conjugate() * main_rotation;
+pub fn constrain_direction(
+    main_direction: Vec3,
+    parent_direction: Vec3,
+    max_angle: f32,
+    strength: f32,
+) -> Vec3{
+    let cos_theta = main_direction.dot(parent_direction);
+    let cos_max = max_angle.cos();
+    if cos_theta >= cos_max {
+        return main_direction;
+    }
 
-    let dir = parent.conjugate() * constraint.identity.conjugate() * constraint.split_dir.as_vec3();
+    let ortho = (main_direction - parent_direction * cos_theta).try_normalize().unwrap_or_else(||{
+        parent_direction.any_orthonormal_vector()
+    });
 
-    let (mut twist, mut swing) = theoretical.twist_swing(dir);
+    let constrained = (parent_direction * cos_max + ortho * max_angle.sin()).normalize();
 
-    let mut scaled_twist = twist.to_scaled_axis();
-    let mut scaled_swing = swing.to_scaled_axis();
-
-    scaled_twist = scaled_twist.clamp_length_max(constraint.twist);
-    scaled_swing = scaled_swing.clamp_length_max(constraint.swing);
-
-        
-    twist = Quat::from_scaled_axis(scaled_twist).normalize();
-    swing = Quat::from_scaled_axis(scaled_swing).normalize();
-
-    twist * swing * constraint.identity * parent   
-
+    main_direction.lerp(constrained, strength).normalize()
 }
-

@@ -53,22 +53,7 @@ impl JointTransform {
 }
 
 
-pub trait QuatExtra{
-    fn twist_swing(&self, dir: Vec3) -> (Quat, Quat);
-}
 
-
-impl QuatExtra for Quat{
-    fn twist_swing(&self, dir: Vec3) -> (Quat, Quat) {
-        let projected = self.xyz().project_onto(dir);
-        let twist = Quat::from_xyzw(projected.x, projected.y, projected.z, self.w).normalize();
-        let swing = *self * twist.inverse();
-
-        (twist, swing)
-    }
-    
-
-}
 
 pub fn rotation_averaging(quats: &Vec<Quat>, weights: &Vec<f32>, quality_count: usize, start_quat: Quat) -> Quat {
     let mut accum = [[0.0; 4]; 4];

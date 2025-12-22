@@ -63,7 +63,6 @@ impl Default for IkGlobalSettings{
 pub struct Joint{
     pub length: f32,
     pub offset: Vec3,
-    pub halfway: bool,
 }
 
 #[derive(Component, Debug, PartialEq, Eq)]
@@ -153,9 +152,11 @@ impl Default for JointBookkeeping{
 pub struct RotationConstraint{
     pub identity: Quat,
     pub weight: f32,
-    pub split_dir: Dir3,
-    pub twist: f32,
-    pub swing: f32,
+    pub strength: f32,
+    pub x_max: f32,
+    pub z_max: f32,
+    pub y: Vec2,
+    
 }
 
 impl Default for RotationConstraint {
@@ -163,12 +164,10 @@ impl Default for RotationConstraint {
         Self{
             identity: Quat::IDENTITY,
             weight: 1.0,
-            split_dir: Dir3::Y,
-            twist: 0.7853,
-            swing: 1.0471,
+            strength: 0.75,
+            y: vec2(-3.1415, 3.1415),
+            x_max: 1.2566,
+            z_max: 1.2566,
         }
     }
 }
-//would be more effective to switch to single axes twist two axes swing but i havent figured out the maths for that yet.
-
-

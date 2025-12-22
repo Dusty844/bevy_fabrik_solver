@@ -23,7 +23,7 @@ pub fn solve(
     for _ in 0..global_joint_settings.iterations {
         forward_reach(&mut bk, top_joints.reborrow(), hierarchy_q.reborrow(), effector_joints.reborrow(), constraint_q.reborrow());
 
-        let new_dist = backward_reach(&mut bk, bottom_joints.reborrow(), hierarchy_q.reborrow(), effector_joints.reborrow());
+        let new_dist = backward_reach(&mut bk, bottom_joints.reborrow(), hierarchy_q.reborrow(), effector_joints.reborrow(), constraint_q.reborrow());
         if bk.last_diff.distance(new_dist) < global_joint_settings.minimum_tolerance {
             bk.last_diff = new_dist;
             break;
@@ -54,7 +54,6 @@ fn forward_reach(
             let main_joint = bk.joints.lock().unwrap().get(main_entity).unwrap().0;
             let mut ee_c: usize = 0;
             let mut children_c = 0;
-            let local_z = main_transform.local_z();
 
             let initial_bottom_point = main_transform.translation - (main_transform.rotation * main_joint.offset);
 
@@ -74,11 +73,26 @@ fn forward_reach(
                         
 
                         let dir = (child_bottom_point - initial_bottom_point).normalize();
-                        let in_rot = Quat::from_rotation_arc(Vec3::Y, dir);
+                        
+                        let identity = if let Ok(constraint) = constraint_q.get(*main_entity) {
+                            constraint.identity
+                        }else{
+                            Quat::IDENTITY
+                        };
+                        
                         let (rot, weight) = if let Ok(constraint) = constraint_q.get(*child) {
-                            (constrain_forward(child_transform.rotation, in_rot, *constraint), constraint.weight)
-                            // (in_rot, 1.0)
+                            let bind_dir = (identity * Vec3::Y).normalize();
+                            let dir_local = child_transform.rotation.inverse() * dir;
+
+                            let constrained_local = constrain_direction(dir_local, bind_dir, constraint.x_max, 0.8);
+
+                            let constrained_global = child_transform.rotation * constrained_local;
+                            
+                            let in_rot = Quat::from_rotation_arc(Vec3::Y, constrained_global);
+                            
+                            (in_rot, constraint.weight)
                         } else {
+                            let in_rot = Quat::from_rotation_arc(Vec3::Y, dir);
                             (in_rot, 1.0)
                         };
                         
@@ -158,6 +172,7 @@ fn backward_reach(
     bottom_joints: Query<(Entity, &BaseJoint), (With<BaseJoint>, Without<JointParent>)>,
     hierarchy_q: Query<(Entity, AnyOf<(&JointParent, &JointChildren)>)>,
     effector_joints: Query<(Entity, &EEJoint)>,
+    constraint_q: Query<&RotationConstraint, With<Joint>>,
 ) -> Vec3 {
     let mut current: Vec<Entity> = vec![];
     let seen = Arc::new(RwLock::new(EntityHashSet::new()));

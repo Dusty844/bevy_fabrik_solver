@@ -41,7 +41,6 @@ fn setup(
     let joint = (Joint{
         length: joint_length,
         offset: Vec3::Y * joint_length * 0.5,
-        halfway: true,
     }
         ,
         RotationConstraint{
