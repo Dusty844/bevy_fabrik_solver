@@ -62,7 +62,8 @@ impl Default for IkGlobalSettings{
 #[require(Transform, JointTransform)]
 pub struct Joint{
     pub length: f32,
-    pub offset: Vec3,
+    pub visual_offset: Vec3,
+    pub anchor_offset: Vec3,
 }
 
 #[derive(Component, Debug, PartialEq, Eq)]

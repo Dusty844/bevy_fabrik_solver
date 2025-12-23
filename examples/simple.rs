@@ -37,15 +37,19 @@ fn setup(
         Transform::IDENTITY.looking_at(Vec3::new(-0.2, -8.0, 0.1), Dir3::Y),
     ));
 
+    //the length of each joint
     let joint_length = 0.2;
-    let joint = (Joint{
-        length: joint_length,
-        offset: Vec3::Y * joint_length * 0.5,
-    }
-        ,
+    
+    let joint = (
+        Joint{
+            length: joint_length,
+            visual_offset: Vec3::Y * joint_length * 0.5,
+            anchor_offset: Vec3::ZERO,
+        },
         RotationConstraint{
             identity: Quat::IDENTITY,
             weight: 1.0,
+            strength: 0.5,
             ..Default::default()
         }
     );
@@ -72,36 +76,35 @@ fn setup(
         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 0.0, 0.0),
-        related!(Children[(
+        children![(
             Name::new("Joint"),
             joint,
             Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(0.0, joint_length, 0.0),
-            related!(Children[(
+            children![(
                 Name::new("Joint"),
                 joint,
                 Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                 MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                 Transform::from_xyz(0.0, joint_length, 0.0),
-                related!(Children[(
+                children![(
                     Name::new("Joint"),
                     joint,
                     Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                     MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                     Transform::from_xyz(0.0, joint_length, 0.0),
-                    // EEJoint(end),
-                    related!(Children[(
+                    children![(
                         Name::new("EndJoint"),
                         joint,
                         Mesh3d(meshes.add(Cone::new(joint_length * 0.3, joint_length))),
                         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                         Transform::from_xyz(0.0, joint_length, 0.0),
                         EEJoint(end),
-                    )])
-                )])
-            )])
-        )])
+                    )]
+                )]
+            )]
+        )]
     ));
 
     

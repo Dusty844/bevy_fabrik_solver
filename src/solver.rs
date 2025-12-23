@@ -55,9 +55,10 @@ fn forward_reach(
             let mut ee_c: usize = 0;
             let mut children_c = 0;
 
-            let initial_bottom_point = main_transform.translation - (main_transform.rotation * main_joint.offset);
+            let initial_bottom_point = main_transform.translation - (main_transform.rotation * main_joint.visual_offset);
 
             let mut p_i1 = Vec3::ZERO;
+            let mut anchor_total = Vec3::ZERO;
             let mut rots = vec![];
             let mut weights = vec![];
             
@@ -69,7 +70,7 @@ fn forward_reach(
                         let child_transform = bk.joints.lock().unwrap().get(child).unwrap().1;
                         let child_joint = bk.joints.lock().unwrap().get(child).unwrap().0;
 
-                        let child_bottom_point = child_transform.translation - (child_transform.rotation * child_joint.offset);
+                        let child_bottom_point = child_transform.translation - (child_transform.rotation * child_joint.visual_offset);
                         
 
                         let dir = (child_bottom_point - initial_bottom_point).normalize();
@@ -99,6 +100,7 @@ fn forward_reach(
 
                         rots.push(rot);
                         weights.push(weight);
+                        anchor_total += child_joint.anchor_offset;
                         p_i1 += child_bottom_point;
                     });
                 }
@@ -126,9 +128,9 @@ fn forward_reach(
                 weights.push(1.0); //weight for end effectors?
                 p_i1 += possible_top_point;
             }
-            p_i1 /= (ee_c + children_c) as f32;
+            
 
-            let new_top_point = p_i1;
+            
 
             //new
             let final_rot = if (children_c + ee_c) <= 1 {
@@ -142,12 +144,19 @@ fn forward_reach(
                 )
             };
 
-            let new_bottom_point = new_top_point - (final_rot * Vec3::Y * main_joint.length);
+            
+            anchor_total = (final_rot * anchor_total);
+
+            p_i1 += anchor_total;
+
+            p_i1 /= (ee_c + children_c) as f32;
+
+            let new_bottom_point = p_i1 - (final_rot * Vec3::Y * main_joint.length);
 
 
             
 
-            let final_translation = new_bottom_point + (final_rot * main_joint.offset);
+            let final_translation = new_bottom_point + (final_rot * main_joint.visual_offset);
             main_transform.translation = final_translation;
             main_transform.rotation = final_rot;
 
@@ -183,7 +192,7 @@ fn backward_reach(
                 let main_joint = bk.joints.lock().unwrap().get(&main_entity).unwrap().0;
                 let mut main_transform = bk.joints.lock().unwrap().get(&main_entity).unwrap().1;
                 let new_bottom_point = bk.bases.read().unwrap().get(&base_joint.0).unwrap().1.translation;
-                main_transform.translation = new_bottom_point + (main_transform.rotation * main_joint.offset);
+                main_transform.translation = new_bottom_point + (main_transform.rotation * main_joint.visual_offset);
 
                 for child in children.0.iter(){
                     current.push(*child);
@@ -213,11 +222,23 @@ fn backward_reach(
                 if let Some(parent) = parent_maybe {
                     let parent_transform = bk.joints.lock().unwrap().get(&parent.0).unwrap().1;
                     let parent_joint = bk.joints.lock().unwrap().get(&parent.0).unwrap().0;
-                    let parent_bottom_point = parent_transform.translation - (parent_transform.rotation * parent_joint.offset);
-                    let parent_top_joint = parent_bottom_point + (parent_transform.rotation * Vec3::Y * parent_joint.length);
-                    main_transform.translation = parent_top_joint + (main_transform.rotation * main_joint.offset);
+
+                    
+                    
+                    // let parent_bottom_point = parent_transform.translation - (parent_transform.rotation * parent_joint.visual_offset);
+                    // let p_top = parent_bottom_point + (parent_transform.rotation * Vec3::Y * parent_joint.length);
+                    // main_transform.translation = p_top + (main_transform.rotation * main_joint.visual_offset);
 
 
+                    //remove visual offset from translation
+                    let parent_real_t = parent_transform.translation - (parent_transform.rotation * parent_joint.visual_offset);
+
+                    let p_top = parent_real_t + (parent_transform.rotation * Vec3::Y * parent_joint.length);
+                    let n_t = p_top + (parent_transform.rotation * main_joint.anchor_offset);
+
+                    //add visual offset into main
+                    main_transform.translation = n_t + (main_transform.rotation * main_joint.visual_offset);
+                    
                     if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {
                         let (_, ee_transform) = *bk.ends.read().unwrap().get(&ee_joint.0).unwrap();
                         let dist = ee_transform.translation - main_transform.translation;
