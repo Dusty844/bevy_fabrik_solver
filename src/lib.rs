@@ -5,6 +5,7 @@ use bevy::{
 use std::sync::{Arc, Mutex, RwLock};
 
 
+
 mod solver;
 
 mod constraint;
@@ -13,14 +14,13 @@ mod bookkeeper;
 
 mod utils;
 
-mod gizmos;
+pub mod gizmos;
 
 
 pub struct IkSolverPlugin;
 
 impl Plugin for IkSolverPlugin{
     fn build(&self, app: &mut App) {
-       
         app.add_systems(PreStartup, bookkeeper::joint_hooks);
         
         app.add_systems(PostUpdate, (
@@ -29,7 +29,7 @@ impl Plugin for IkSolverPlugin{
             solver::solve,
             bookkeeper::sync_transforms,
         ).chain().before(TransformSystems::Propagate));
-        app.add_systems(PostUpdate, (bookkeeper::force_gt, gizmos::joint_directional_gizmos).after(TransformSystems::Propagate));
+        app.add_systems(PostUpdate, (bookkeeper::force_gt).after(TransformSystems::Propagate));
         
         app.insert_resource(IkGlobalSettings::default());
         app.insert_resource(JointBookkeeping::default());

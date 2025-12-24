@@ -75,15 +75,10 @@ fn forward_reach(
 
                         let up_dir = (child_bottom_point - initial_bottom_point).normalize();
                         
-                        let identity = if let Ok(constraint) = constraint_q.get(*main_entity) {
-                            constraint.identity
-                        }else{
-                            Quat::IDENTITY
-                        };
-                        
+                                                
                         let (rot, weight) = if let Ok(constraint) = constraint_q.get(*child) {
-                            let bind_up_dir = (identity * Vec3::Y).normalize();
-                            let bind_forward_dir = (identity * Vec3::Z).normalize();
+                            let bind_up_dir = (constraint.identity * Vec3::Y).normalize();
+                            let bind_forward_dir = (constraint.identity * Vec3::Z).normalize();
                             
                             let up_dir_local = child_transform.rotation.inverse() * up_dir;
                             let forward_dir_local = child_transform.rotation.inverse() * main_forward;
@@ -235,11 +230,38 @@ fn backward_reach(
                     //remove visual offset from translation
                     let parent_real_t = parent_transform.translation - (parent_transform.rotation * parent_joint.visual_offset);
 
-                    let p_top = parent_real_t + (parent_transform.rotation * Vec3::Y * parent_joint.length);
-                    let n_t = p_top + (parent_transform.rotation * main_joint.anchor_offset);
+                    let parent_top = parent_real_t + (parent_transform.rotation * Vec3::Y * parent_joint.length);
+                    let anchor_pos = parent_top + (parent_transform.rotation * main_joint.anchor_offset);
+
+                    //remove visual offset from here aswell
+                    let main_real_t = main_transform.translation - (main_transform.rotation * main_joint.visual_offset);
+                    let main_top = main_real_t + (main_transform.rotation * Vec3::Y * main_joint.length);
+                    
+
+                    let up_dir = (main_top - anchor_pos).normalize();
+
+                    let main_forward = main_transform.local_z().as_vec3();
+
+                    if let Ok(constraint) = constraint_q.get(*main_entity){
+                        let bind_up_dir = (constraint.identity * Vec3::Y).normalize();
+                        let bind_forward_dir = (constraint.identity * Vec3::Z).normalize();
+                            
+                        let up_dir_local = parent_transform.rotation.inverse() * up_dir;
+                        let forward_dir_local = parent_transform.rotation.inverse() * main_forward;
+                        
+                        let constrained_local_up = constrain_direction_ellipse(up_dir_local, bind_up_dir, f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
+
+                        let constrained_local_forward = constrain_direction_cone(forward_dir_local, bind_forward_dir, f32::max( constraint.y_max, 0.0000001), constraint.strength);
+
+                        let constrained_global_up = parent_transform.rotation * constrained_local_up;
+
+                        let constrained_global_forward = parent_transform.rotation * constrained_local_forward;
+
+                        main_transform.rotation = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
+                    }
 
                     //add visual offset into main
-                    main_transform.translation = n_t + (main_transform.rotation * main_joint.visual_offset);
+                    main_transform.translation = anchor_pos + (main_transform.rotation * main_joint.visual_offset);
                     
                     if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {
                         let (_, ee_transform) = *bk.ends.read().unwrap().get(&ee_joint.0).unwrap();
