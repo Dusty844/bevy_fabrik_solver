@@ -56,6 +56,7 @@ fn forward_reach(
             let mut children_c = 0;
 
             let initial_bottom_point = main_transform.translation - (main_transform.rotation * main_joint.visual_offset);
+            let main_forward = main_transform.local_z().as_vec3();
 
             let mut p_i1 = Vec3::ZERO;
             let mut anchor_total = Vec3::ZERO;
@@ -71,9 +72,8 @@ fn forward_reach(
                         let child_joint = bk.joints.lock().unwrap().get(child).unwrap().0;
 
                         let child_bottom_point = child_transform.translation - (child_transform.rotation * child_joint.visual_offset);
-                        
 
-                        let dir = (child_bottom_point - initial_bottom_point).normalize();
+                        let up_dir = (child_bottom_point - initial_bottom_point).normalize();
                         
                         let identity = if let Ok(constraint) = constraint_q.get(*main_entity) {
                             constraint.identity
@@ -82,18 +82,26 @@ fn forward_reach(
                         };
                         
                         let (rot, weight) = if let Ok(constraint) = constraint_q.get(*child) {
-                            let bind_dir = (identity * Vec3::Y).normalize();
-                            let dir_local = child_transform.rotation.inverse() * dir;
-
-                            let constrained_local = constrain_direction(dir_local, bind_dir, constraint.x_max, 0.8);
-
-                            let constrained_global = child_transform.rotation * constrained_local;
+                            let bind_up_dir = (identity * Vec3::Y).normalize();
+                            let bind_forward_dir = (identity * Vec3::Z).normalize();
                             
-                            let in_rot = Quat::from_rotation_arc(Vec3::Y, constrained_global);
+                            let up_dir_local = child_transform.rotation.inverse() * up_dir;
+                            let forward_dir_local = child_transform.rotation.inverse() * main_forward;
+                            
+                            let constrained_local_up = constrain_direction_ellipse(up_dir_local, bind_up_dir, f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
+
+                            let constrained_local_forward = constrain_direction_cone(forward_dir_local, bind_forward_dir, f32::max( constraint.y_max, 0.0000001), constraint.strength);
+
+                            let constrained_global_up = child_transform.rotation * constrained_local_up;
+
+                            let constrained_global_forward = child_transform.rotation * constrained_local_forward;
+
+                            let in_rot = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
+                                                       
                             
                             (in_rot, constraint.weight)
                         } else {
-                            let in_rot = Quat::from_rotation_arc(Vec3::Y, dir);
+                            let in_rot = Quat::from_rotation_arc(Vec3::Y, up_dir);
                             (in_rot, 1.0)
                         };
                         
@@ -145,7 +153,7 @@ fn forward_reach(
             };
 
             
-            anchor_total = (final_rot * anchor_total);
+            anchor_total = final_rot * anchor_total;
 
             p_i1 += anchor_total;
 
@@ -222,14 +230,8 @@ fn backward_reach(
                 if let Some(parent) = parent_maybe {
                     let parent_transform = bk.joints.lock().unwrap().get(&parent.0).unwrap().1;
                     let parent_joint = bk.joints.lock().unwrap().get(&parent.0).unwrap().0;
-
+                  
                     
-                    
-                    // let parent_bottom_point = parent_transform.translation - (parent_transform.rotation * parent_joint.visual_offset);
-                    // let p_top = parent_bottom_point + (parent_transform.rotation * Vec3::Y * parent_joint.length);
-                    // main_transform.translation = p_top + (main_transform.rotation * main_joint.visual_offset);
-
-
                     //remove visual offset from translation
                     let parent_real_t = parent_transform.translation - (parent_transform.rotation * parent_joint.visual_offset);
 

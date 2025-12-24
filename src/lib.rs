@@ -13,6 +13,8 @@ mod bookkeeper;
 
 mod utils;
 
+mod gizmos;
+
 
 pub struct IkSolverPlugin;
 
@@ -27,7 +29,7 @@ impl Plugin for IkSolverPlugin{
             solver::solve,
             bookkeeper::sync_transforms,
         ).chain().before(TransformSystems::Propagate));
-        app.add_systems(PostUpdate, bookkeeper::force_gt.after(TransformSystems::Propagate));
+        app.add_systems(PostUpdate, (bookkeeper::force_gt, gizmos::joint_directional_gizmos).after(TransformSystems::Propagate));
         
         app.insert_resource(IkGlobalSettings::default());
         app.insert_resource(JointBookkeeping::default());
@@ -156,7 +158,7 @@ pub struct RotationConstraint{
     pub strength: f32,
     pub x_max: f32,
     pub z_max: f32,
-    pub y: Vec2,
+    pub y_max: f32,
     
 }
 
@@ -166,9 +168,9 @@ impl Default for RotationConstraint {
             identity: Quat::IDENTITY,
             weight: 1.0,
             strength: 0.75,
-            y: vec2(-3.1415, 3.1415),
-            x_max: 1.2566,
-            z_max: 1.2566,
+            y_max: 1.5707, // pi/2
+            x_max: 1.2566, // 2pi/5
+            z_max: 1.2566, // 2pi/5
         }
     }
 }
