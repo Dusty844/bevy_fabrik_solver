@@ -58,7 +58,7 @@ fn forward_reach(
             let initial_bottom_point = main_transform.translation - (main_transform.rotation * main_joint.visual_offset);
             let main_forward = main_transform.local_z().as_vec3();
 
-            let mut p_i1 = Vec3::ZERO;
+            let mut avg_top = Vec3::ZERO;
             let mut anchor_total = Vec3::ZERO;
             let mut rots = vec![];
             let mut weights = vec![];
@@ -77,19 +77,17 @@ fn forward_reach(
                         
                                                 
                         let (rot, weight) = if let Ok(constraint) = constraint_q.get(*child) {
-                            let bind_up_dir = (constraint.identity * Vec3::Y).normalize();
-                            let bind_forward_dir = (constraint.identity * Vec3::Z).normalize();
+                            //constraining in the forward pass might be the wrong play in general
+                            let local_up_dir = (constraint.identity.inverse() * up_dir).normalize();
+                            let local_forward_dir = (constraint.identity.inverse() * main_forward).normalize();
                             
-                            let up_dir_local = child_transform.rotation.inverse() * up_dir;
-                            let forward_dir_local = child_transform.rotation.inverse() * main_forward;
-                            
-                            let constrained_local_up = constrain_direction_ellipse(up_dir_local, bind_up_dir, f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
+                            let constrained_local_up = constrain_direction_ellipse(local_up_dir, child_transform.local_y().as_vec3(), f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
 
-                            let constrained_local_forward = constrain_direction_cone(forward_dir_local, bind_forward_dir, f32::max( constraint.y_max, 0.0000001), constraint.strength);
+                            let constrained_local_forward = constrain_direction_cone(local_forward_dir, child_transform.local_z().as_vec3(), f32::max( constraint.y_max, 0.0000001), constraint.strength);
 
-                            let constrained_global_up = child_transform.rotation * constrained_local_up;
+                            let constrained_global_up = constraint.identity * constrained_local_up;
 
-                            let constrained_global_forward = child_transform.rotation * constrained_local_forward;
+                            let constrained_global_forward = constraint.identity * constrained_local_forward;
 
                             let in_rot = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
                                                        
@@ -104,7 +102,7 @@ fn forward_reach(
                         rots.push(rot);
                         weights.push(weight);
                         anchor_total += child_joint.anchor_offset;
-                        p_i1 += child_bottom_point;
+                        avg_top += child_bottom_point;
                     });
                 }
                 if let Some(parent) = parent_maybe
@@ -128,8 +126,8 @@ fn forward_reach(
                 };
                 
                 rots.push(rot);
-                weights.push(1.0); //weight for end effectors?
-                p_i1 += possible_top_point;
+                weights.push(ee.weight);
+                avg_top += possible_top_point;
             }
             
 
@@ -150,11 +148,11 @@ fn forward_reach(
             
             anchor_total = final_rot * anchor_total;
 
-            p_i1 += anchor_total;
+            avg_top += anchor_total;
 
-            p_i1 /= (ee_c + children_c) as f32;
+            avg_top /= (ee_c + children_c) as f32;
 
-            let new_bottom_point = p_i1 - (final_rot * Vec3::Y * main_joint.length);
+            let new_bottom_point = avg_top - (final_rot * Vec3::Y * main_joint.length);
 
 
             
@@ -243,19 +241,18 @@ fn backward_reach(
                     let main_forward = main_transform.local_z().as_vec3();
 
                     if let Ok(constraint) = constraint_q.get(*main_entity){
-                        let bind_up_dir = (constraint.identity * Vec3::Y).normalize();
-                        let bind_forward_dir = (constraint.identity * Vec3::Z).normalize();
+                        let local_up_dir = (constraint.identity.inverse() * up_dir).normalize();
+                        let local_forward_dir = (constraint.identity.inverse() * main_forward).normalize();
                             
-                        let up_dir_local = parent_transform.rotation.inverse() * up_dir;
-                        let forward_dir_local = parent_transform.rotation.inverse() * main_forward;
-                        
-                        let constrained_local_up = constrain_direction_ellipse(up_dir_local, bind_up_dir, f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
+                            
+                            
+                        let constrained_local_up = constrain_direction_ellipse(local_up_dir, parent_transform.local_y().as_vec3(), f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
 
-                        let constrained_local_forward = constrain_direction_cone(forward_dir_local, bind_forward_dir, f32::max( constraint.y_max, 0.0000001), constraint.strength);
+                        let constrained_local_forward = constrain_direction_cone(local_forward_dir, parent_transform.local_z().as_vec3(), f32::max( constraint.y_max, 0.0000001), constraint.strength);
 
-                        let constrained_global_up = parent_transform.rotation * constrained_local_up;
+                        let constrained_global_up = constraint.identity * constrained_local_up;
 
-                        let constrained_global_forward = parent_transform.rotation * constrained_local_forward;
+                        let constrained_global_forward = constraint.identity * constrained_local_forward;
 
                         main_transform.rotation = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
                     }

@@ -107,6 +107,18 @@ pub struct EndEffector{
     pub joint: Entity,
     pub joint_center: bool,
     pub joint_copy_rotation: bool,
+    pub weight: f32,
+}
+
+impl Default for EndEffector{
+    fn default() -> Self {
+        Self {
+            joint: Entity::PLACEHOLDER,
+            joint_center: false,
+            joint_copy_rotation: false,
+            weight: 1.0
+        }
+    }
 }
 
 #[derive(Component, Clone, Copy, Debug)]
@@ -118,6 +130,12 @@ pub struct EEJoint(pub Entity);
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(JointTransform)]
 pub struct Base(pub Entity);
+
+impl Default for Base{
+    fn default() -> Self {
+        Self(Entity::PLACEHOLDER)
+    }
+}
 
 #[derive(Component, Clone, Copy, Debug)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]

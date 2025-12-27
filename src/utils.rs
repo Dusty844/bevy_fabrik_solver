@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use super::JointTransform;
+use std::time::Instant;
 
 impl JointTransform {
     pub fn local_x(self) -> Dir3 {
@@ -52,30 +53,25 @@ impl JointTransform {
     
 }
 
-
-
-
 pub fn rotation_averaging(quats: &Vec<Quat>, weights: &Vec<f32>, quality_count: usize, start_quat: Quat) -> Quat {
-    let mut accum = [[0.0; 4]; 4];
-    for (x, quat) in quats.iter().enumerate() {
-        for i in 0..4 {
-            for j in 0..4 {
-                accum[i][j] += weights[x] * (quat.to_array()[i] * quat.to_array()[j]);
-            }
-        }
+    let mut accum = Mat4::ZERO;
+    for (i, quat) in quats.iter().enumerate() {
+        let [x, y, z, w] = quat.to_array();
+        let v = Vec4::new(x, y, z, w);
+        accum += weights[i] * Mat4::from_cols(
+        v * x,
+        v * y,
+        v * z,
+        v * w,
+    );
     }
 
     let mut final_rot = start_quat.normalize();
 
-    //higher the count, the better the approximation, when testing without a start quaternion
     for _ in 0..quality_count {
-        let mut svd = [0.0; 4];
-        for i in 0..4 {
-            for j in 0..4 {
-                svd[i] += accum[i][j] * final_rot.to_array()[j]
-            }
-        }
-        final_rot = Quat::from_array(svd).normalize();
+        let svd = accum.mul_vec4(final_rot.into());
+        
+        final_rot = Quat::from_vec4(svd).normalize();
     }
     if final_rot.x < 0.0 {
         final_rot *= Quat::from_slice(&[-1.0; 4]);

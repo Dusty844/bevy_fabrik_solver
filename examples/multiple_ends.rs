@@ -13,11 +13,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut ik_settings: ResMut<IkGlobalSettings>,
-    
 ){
-    //since we have a standard (bevy Children and ChildOf), set this to true
-    ik_settings.force_global_transform = true;
     
     commands.spawn((
         Camera3d::default(),
@@ -34,22 +30,22 @@ fn setup(
 
     //the length of each joint
     let joint_length = 0.2;
-    
-    let joint = (
-        Joint{
-            length: joint_length,
-            visual_offset: Vec3::Y * joint_length * 0.5,
 
-            //the offset of the current base from the parent's end, obviously doesn't do anything to the bottom joint.
-            anchor_offset: Vec3::ZERO,
-        },
-        RotationConstraint{
+    
+    // rotational constraints aren't perfect at the moment, particularly
+    // when an joint has multiple children, which is why i choose not to
+    // use it in this example.
+    let joint = (Joint{
+        length: joint_length,
+        visual_offset: Vec3::Y * joint_length * 0.5,
+        anchor_offset: Vec3::ZERO,
+    }, RotationConstraint{
             identity: Quat::IDENTITY,
             weight: 1.0,
             strength: 0.95,
             ..Default::default()
         }
-    );
+);
 
     let mesh = (
         Mesh3d(meshes.add(Cone::new(joint_length * 0.15, joint_length))),
@@ -62,14 +58,11 @@ fn setup(
         ..Default::default()
     };
     
-    //the Base, the entity that the root / base joint attatches itself to.
     let base = commands.spawn((
         Name::new("Base"),
-        Base::default(),
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
         MeshMaterial3d(materials.add(base_material)),
         Transform::from_xyz(0.0, 0.0, 0.0),
-
     )).observe(translate_on_drag).observe(hover_scroll).id();
 
     let end_material = StandardMaterial{
@@ -79,25 +72,23 @@ fn setup(
     };
     
     
-    //The End Effector, the entity that the chain points to.
-    let end = commands.spawn((
-        Name::new("End"),
-        EndEffector::default(),
+    let end1 = commands.spawn((
+        Name::new("End 1"),
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
-        MeshMaterial3d(materials.add(end_material)),
-        Transform::from_xyz(0.0, 1.0, 0.0),
+        MeshMaterial3d(materials.add(end_material.clone())),
+        Transform::from_xyz(-0.25, 1.0, 0.0),
     )).observe(translate_on_drag).observe(hover_scroll).id();
 
-// A joint chain does not need to use bevy's default transform hierarchy
-// of Children and ChildOf, since it uses it's own relationship being
-// JointChildren and JointParent, we can use the default here because of
-// a function that runs on startup which automatically places the required
-// JointParent and JointChildren Components onto joints if they have
-// parents or children that also have the Joint component on them. You
-// don't have to spawn the joints as Children of eachother directly like
-// we are here with the children! macro, but if you don't then be sure
-// to add the relationships yourself, either using related! macro or
-// some other way. 
+    let end2 = commands.spawn((
+        Name::new("End 2"),
+        Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
+        MeshMaterial3d(materials.add(end_material.clone())),
+        Transform::from_xyz(0.25, 1.0, 0.0),
+    )).observe(translate_on_drag).observe(hover_scroll).id();
+
+// when doing it this way, the joints aren't acutally children of
+// eachother as far as bevy is concerned, they're only connected in the
+// eyes of the ik plugin
 
     commands.spawn((
         Name::new("BaseJoint"),
@@ -105,37 +96,54 @@ fn setup(
         joint,
         mesh.clone(),
         Transform::from_xyz(0.0, 0.0, 0.0),
-        children![(
+        related!(JointChildren[(
             Name::new("Joint"),
             joint,
             mesh.clone(),
             Transform::from_xyz(0.0, joint_length, 0.0),
-            children![(
+            related!(JointChildren[(
                 Name::new("Joint"),
                 joint,
                 mesh.clone(),
                 Transform::from_xyz(0.0, joint_length, 0.0),
-                children![(
+                related!(JointChildren[(
                     Name::new("Joint"),
                     joint,
                     mesh.clone(),
                     Transform::from_xyz(0.0, joint_length, 0.0),
-                    children![(
+                    related!(JointChildren[(
                         Name::new("EndJoint"),
                         joint,
                         mesh.clone(),
                         Transform::from_xyz(0.0, joint_length, 0.0),
-                        EEJoint(end),
-                    )]
-                )]
-            )]
-        )]
+                        EEJoint(end1),
+                    )])
+                )])
+            ), (
+                Name::new("Joint"),
+                joint,
+                mesh.clone(),
+                Transform::from_xyz(0.0, joint_length, 0.0),
+                related!(JointChildren[(
+                    Name::new("Joint"),
+                    joint,
+                    mesh.clone(),
+                    Transform::from_xyz(0.0, joint_length, 0.0),
+                    related!(JointChildren[(
+                        Name::new("EndJoint"),
+                        joint,
+                        mesh.clone(),
+                        Transform::from_xyz(0.0, joint_length, 0.0),
+                        EEJoint(end2),
+                    )])
+                )])
+            )])
+        )])
     ));
 
 }
 
 
-// observer to translate the end and base in this example.
 fn translate_on_drag(
     drag: On<Pointer<Drag>>,
     mut transforms: Query<&mut Transform>,
@@ -176,7 +184,6 @@ fn translate_on_drag(
     }
 }
 
-//so the scroll part works when we aren't dragging
 fn hover_scroll(
     scroll_e: On<Pointer<Scroll>>,
     mut transforms: Query<&mut Transform>,

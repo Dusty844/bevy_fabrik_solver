@@ -51,6 +51,7 @@ pub fn joint_hooks(
                     joint: context.entity,
                     joint_center: false,
                     joint_copy_rotation: false,
+                    weight: 1.0,
                 });
             //handles only insertion of basejoint
         
