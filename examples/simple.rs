@@ -142,40 +142,42 @@ fn translate_on_drag(
     camera_s: Single<(&Camera, &GlobalTransform)>,
     scroll: Res<AccumulatedMouseScroll>,
 ){
-    let Ok(mut transform) = transforms.get_mut(drag.entity) else {
-        return;
-    };
+    if drag.button == PointerButton::Primary {
+        let Ok(mut transform) = transforms.get_mut(drag.entity) else {
+            return;
+        };
 
-    let (camera, camera_transform) = *camera_s;
+        let (camera, camera_transform) = *camera_s;
 
-    let cursor_pos = drag.pointer_location.position;
+        let cursor_pos = drag.pointer_location.position;
 
-    let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) else {
-        return;
-    };
+        let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) else {
+            return;
+        };
 
-    let depth = ray
-        .direction
-        .dot(transform.translation - ray.origin);
+        let depth = ray
+            .direction
+            .dot(transform.translation - ray.origin);
 
-    if depth <= 0.0 {
-        return;
-    }
+        if depth <= 0.0 {
+            return;
+        }
 
-    let shifted_cursor = cursor_pos + drag.delta;
+        let shifted_cursor = cursor_pos + drag.delta;
 
-    let Ok(shifted_ray) =
-        camera.viewport_to_world(camera_transform, shifted_cursor)
-    else {
-        return;
-    };
+        let Ok(shifted_ray) =
+            camera.viewport_to_world(camera_transform, shifted_cursor)
+        else {
+            return;
+        };
 
-    transform.translation = shifted_ray.get_point(depth);
-    if scroll.delta.y.abs() > 0.0 {
-        transform.translation += ray.direction * scroll.delta.y * 0.1;
-    }
+        transform.translation = shifted_ray.get_point(depth);
+        if scroll.delta.y.abs() > 0.0 {
+            transform.translation += ray.direction * scroll.delta.y * 0.1;
+        }
+    } 
+    
 }
-
 //so the scroll part works when we aren't dragging
 fn hover_scroll(
     scroll_e: On<Pointer<Scroll>>,

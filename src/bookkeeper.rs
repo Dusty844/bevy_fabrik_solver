@@ -20,7 +20,6 @@ pub fn joint_hooks(
     world: &mut World,
 ){
 
-    //remove the joint from the book, what to do about parents and children?, no idea...
     world.register_component_hooks::<Joint>()
     .on_remove(
         |mut world, context|{
@@ -33,7 +32,6 @@ pub fn joint_hooks(
         .on_add(|mut world, context|{
             let joint = world.get::<EndEffector>(context.entity).unwrap().joint;
             world.commands().entity(joint).insert(EEJoint(context.entity));
-            //handles only insertion of basejoint
         
         })
         .on_remove(
@@ -45,15 +43,21 @@ pub fn joint_hooks(
 
     world.register_component_hooks::<EEJoint>()
         .on_add(|mut world, context|{
-            let joint = world.get::<EEJoint>(context.entity).unwrap().0;
-            world.commands().entity(joint).insert(
+            let effector = world.get::<EEJoint>(context.entity).unwrap().0;
+            let (mut j_c, mut j_c_r, mut w) = (false, false, 1.0);
+            if let Some(ee) = world.get::<EndEffector>(effector) {
+                j_c = ee.joint_center;
+                j_c_r = ee.joint_copy_rotation;
+                w = ee.weight;
+            }
+
+            world.commands().entity(effector).insert(
                 EndEffector{
                     joint: context.entity,
-                    joint_center: false,
-                    joint_copy_rotation: false,
-                    weight: 1.0,
+                    joint_center: j_c,
+                    joint_copy_rotation: j_c_r,
+                    weight: w,
                 });
-            //handles only insertion of basejoint
         
         })
         .on_remove(
@@ -84,8 +88,8 @@ pub fn joint_hooks(
 
     world.register_component_hooks::<BaseJoint>()
         .on_add(|mut world, context|{
-            let joint = world.get::<BaseJoint>(context.entity).unwrap().0;
-            world.commands().entity(joint).insert(
+            let base = world.get::<BaseJoint>(context.entity).unwrap().0;
+            world.commands().entity(base).insert(
                 Base(context.entity));
             //handles only insertion of basejoint
         

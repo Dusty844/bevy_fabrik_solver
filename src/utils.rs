@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use super::JointTransform;
-use std::time::Instant;
 
 impl JointTransform {
     pub fn local_x(self) -> Dir3 {
@@ -73,8 +72,16 @@ pub fn rotation_averaging(quats: &Vec<Quat>, weights: &Vec<f32>, quality_count: 
         
         final_rot = Quat::from_vec4(svd).normalize();
     }
-    if final_rot.x < 0.0 {
-        final_rot *= Quat::from_slice(&[-1.0; 4]);
+    quat_abs(final_rot)
+}
+
+
+pub fn quat_abs(
+    mut x: Quat
+) -> Quat {
+    if x.w < 0.0 {
+        -x
+    } else {
+        x
     }
-    final_rot
 }
