@@ -124,11 +124,11 @@ fn forward_reach(
             let mut rots = vec![];
             let mut weights = vec![];
 
-            let identity = if let Ok(constraint) = constraint_q.get(*main_entity) {
-                constraint.identity
+            let (identity, strength) = if let Ok(constraint) = constraint_q.get(*main_entity) {
+                (constraint.identity.normalize(), constraint.strength)
             } else {
-                Quat::IDENTITY
-            }.normalize();
+                (Quat::IDENTITY, 1.0)
+            };
 
             if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {
                 ee_c = 1;
@@ -185,24 +185,20 @@ fn forward_reach(
                         let child_transform = bk.joints.lock().unwrap().get(child).unwrap().1;
 
                         let (rot, weight) = if let Ok(constraint) = constraint_q.get(*child) {
-                            //constraining in the forward pass might be the wrong play in general
-                            
-                            
-                            let constrained_local_up = constrain_direction_ellipse(local_up_dir, child_transform.local_y().as_vec3(), f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
 
-                            let constrained_local_forward = constrain_direction_cone(local_forward_dir, child_transform.local_z().as_vec3(), f32::max( constraint.y_max, 0.0000001), constraint.strength);
+                            let constrained_local_up = constrain_direction_ellipse(local_up_dir,constraint.identity.conjugate() * child_transform.local_y().as_vec3(), f32::max(constraint.x.y, 0.0000001),f32::max( constraint.z.y, 0.0000001), constraint.strength);
+
+                            let constrained_local_forward = constrain_direction_cone(local_forward_dir, constraint.identity.conjugate() * child_transform.local_y().as_vec3(), f32::max( constraint.y.y, 0.0000001), constraint.strength);
 
                             let constrained_global_up = constraint.identity * constrained_local_up;
 
                             let constrained_global_forward = constraint.identity * constrained_local_forward;
 
-                            let in_rot = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
-                                                       
-                            
-                            (in_rot, constraint.weight)
+                            let rot = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
+                            (rot, constraint.weight)
                         } else {
-                            let in_rot = Quat::from_rotation_arc(Vec3::Y, up_dir);
-                            (in_rot, 1.0)
+                            let rot = Transform::IDENTITY.aligned_by(Vec3::Y, up_dir, Vec3::Z, main_forward).rotation;
+                            (rot, 1.0)
                         };
                         
 
@@ -287,12 +283,60 @@ fn backward_reach(
             if let Some(children) = child_maybe {
                 let main_joint = bk.joints.lock().unwrap().get(&main_entity).unwrap().0;
                 let mut main_transform = bk.joints.lock().unwrap().get(&main_entity).unwrap().1;
-                let new_bottom_point = bk.bases.read().unwrap().get(&base_joint.0).unwrap().1.translation;
-                main_transform.translation = new_bottom_point + (main_transform.rotation * main_joint.visual_offset);
-
+                let base_transform = bk.bases.read().unwrap().get(&base_joint.0).unwrap().1;
+                let new_bottom_point = base_transform.translation;
+                let mut avg_top = Vec3::ZERO;
+                let mut anchor_total = Vec3::ZERO;
+                
                 for child in children.0.iter(){
+                    let child_transform = bk.joints.lock().unwrap().get(child).unwrap().1;
+                    let child_joint = bk.joints.lock().unwrap().get(child).unwrap().0;
+                    let child_bottom_point = child_transform.translation - (child_transform.rotation * child_joint.visual_offset);
+
+                    anchor_total += child_joint.anchor_offset;
+                    avg_top += child_bottom_point;
                     current.push(*child);
                 }
+
+                let anchor_pos = new_bottom_point + (base_transform.rotation * main_joint.anchor_offset);
+                let pre_top = (avg_top + main_transform.rotation * anchor_total) / children.0.len() as f32;
+                let up_dir = (pre_top - anchor_pos).normalize();
+
+                let main_forward = main_transform.local_z().as_vec3();
+
+                if let Ok(constraint) = constraint_q.get(main_entity){
+                    let local_up_dir = (constraint.identity.inverse() * up_dir).normalize();
+                    let local_forward_dir = (constraint.identity.inverse() * main_forward).normalize();
+                            
+                    let constrained_local_up = constrain_direction_ellipse(local_up_dir, base_transform.local_y().as_vec3(), f32::max(constraint.x.y, 0.0000001),f32::max( constraint.z.y, 0.0000001), constraint.strength);
+
+                    let constrained_local_forward = constrain_direction_cone(local_forward_dir, base_transform.local_z().as_vec3(), f32::max( constraint.y.y, 0.0000001), constraint.strength);
+
+                    let constrained_global_up = constraint.identity * constrained_local_up;
+
+                    let constrained_global_forward = constraint.identity * constrained_local_forward;
+
+                    let final_rot = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
+
+                                                    
+                    if final_rot.dot(main_transform.rotation) < 0.0{
+                        main_transform.rotation = -final_rot;
+                    } else {
+                        main_transform.rotation = final_rot;
+                    }
+                } else {
+                    let final_rot = Quat::from_rotation_arc(Vec3::Y, up_dir);
+                        
+                    if final_rot.dot(main_transform.rotation) < 0.0{
+                        main_transform.rotation = -final_rot;
+                    } else {
+                        main_transform.rotation = final_rot;
+                    }
+                    
+                }
+                
+
+                main_transform.translation = anchor_pos + (main_transform.rotation * main_joint.visual_offset);
 
                 if let Ok((_, ee_joint)) = effector_joints.get(main_entity) {
                     let (_, ee_transform) = *bk.ends.read().unwrap().get(&ee_joint.0).unwrap();
@@ -318,6 +362,11 @@ fn backward_reach(
                 if let Some(parent) = parent_maybe {
                     let parent_transform = bk.joints.lock().unwrap().get(&parent.0).unwrap().1;
                     let parent_joint = bk.joints.lock().unwrap().get(&parent.0).unwrap().0;
+                    let parent_identity = if let Ok(constraint) = constraint_q.get(parent.0){
+                        constraint.identity.normalize()
+                    } else {
+                        Quat::IDENTITY
+                    };
                   
                     
                     //remove visual offset from translation
@@ -339,9 +388,9 @@ fn backward_reach(
                         let local_up_dir = (constraint.identity.inverse() * up_dir).normalize();
                         let local_forward_dir = (constraint.identity.inverse() * main_forward).normalize();
                             
-                        let constrained_local_up = constrain_direction_ellipse(local_up_dir, parent_transform.local_y().as_vec3(), f32::max(constraint.x_max, 0.0000001),f32::max( constraint.z_max, 0.0000001), constraint.strength);
+                        let constrained_local_up = constrain_direction_ellipse(local_up_dir, parent_identity.inverse() * parent_transform.local_y().as_vec3(), f32::max(constraint.x.y, 0.0000001),f32::max( constraint.z.y, 0.0000001), constraint.strength);
 
-                        let constrained_local_forward = constrain_direction_cone(local_forward_dir, parent_transform.local_z().as_vec3(), f32::max( constraint.y_max, 0.0000001), constraint.strength);
+                        let constrained_local_forward = constrain_direction_cone(local_forward_dir, parent_identity.inverse() * parent_transform.local_z().as_vec3(), f32::max( constraint.y.y, 0.0000001), constraint.strength);
 
                         let constrained_global_up = constraint.identity * constrained_local_up;
 
@@ -349,6 +398,7 @@ fn backward_reach(
 
                         let final_rot = Transform::IDENTITY.aligned_by(Vec3::Y, constrained_global_up, Vec3::Z, constrained_global_forward).rotation;
 
+                                                    
                         if final_rot.dot(main_transform.rotation) < 0.0{
                             main_transform.rotation = -final_rot;
                         } else {

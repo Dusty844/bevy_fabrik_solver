@@ -77,7 +77,7 @@ pub fn rotation_averaging(quats: &Vec<Quat>, weights: &Vec<f32>, quality_count: 
 
 
 pub fn quat_abs(
-    mut x: Quat
+    x: Quat
 ) -> Quat {
     if x.w < 0.0 {
         -x
@@ -85,3 +85,4 @@ pub fn quat_abs(
         x
     }
 }
+

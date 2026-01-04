@@ -174,10 +174,10 @@ pub struct RotationConstraint{
     pub identity: Quat,
     pub weight: f32,
     pub strength: f32,
-    pub x_max: f32,
-    pub z_max: f32,
-    pub y_max: f32,
-    
+    pub default_dir: Vec3,
+    pub y: Vec2,
+    pub x: Vec2,
+    pub z: Vec2,    
 }
 
 impl Default for RotationConstraint {
@@ -186,9 +186,10 @@ impl Default for RotationConstraint {
             identity: Quat::IDENTITY,
             weight: 1.0,
             strength: 0.75,
-            y_max: 1.5707, // pi/2
-            x_max: 1.2566, // 2pi/5
-            z_max: 1.2566, // 2pi/5
+            default_dir: Vec3::Y,
+            y: vec2(-1.256, 1.256),
+            x: vec2(-1.570, 1.570),
+            z: vec2(-1.570, 1.570)
         }
     }
 }

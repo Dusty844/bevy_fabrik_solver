@@ -98,8 +98,8 @@ pub fn rotation_constraint_gizmos(
 
             
                 //x swing limits
-                let limit_pos_x = Quat::from_rotation_x(constraint.x_max) * identity_up_dir;
-                let limit_neg_x = Quat::from_rotation_x(-constraint.x_max) * identity_up_dir;
+                let limit_pos_x = Quat::from_rotation_x(constraint.x.y) * identity_up_dir;
+                let limit_neg_x = Quat::from_rotation_x(-constraint.x.y) * identity_up_dir;
 
                 gizmos.arrow(translation, translation + (limit_pos_x * main_joint.length * 0.25), settings.limits_color);
                 gizmos.arrow(translation, translation + (limit_neg_x * main_joint.length * 0.25), settings.limits_color);
@@ -107,8 +107,8 @@ pub fn rotation_constraint_gizmos(
 
             
                 //z swing limits
-                let limit_pos_z = Quat::from_rotation_z(constraint.z_max) * identity_up_dir;
-                let limit_neg_z = Quat::from_rotation_z(-constraint.z_max) * identity_up_dir;
+                let limit_pos_z = Quat::from_rotation_z(constraint.z.y) * identity_up_dir;
+                let limit_neg_z = Quat::from_rotation_z(-constraint.z.y) * identity_up_dir;
 
                 gizmos.arrow(translation, translation + (limit_pos_z * main_joint.length * 0.25), settings.limits_color);
                 gizmos.arrow(translation, translation + (limit_neg_z * main_joint.length * 0.25), settings.limits_color);
@@ -118,7 +118,7 @@ pub fn rotation_constraint_gizmos(
                 let rot = Transform::IDENTITY.aligned_by(Vec3::Y, main_t.local_y(), Vec3::Z, constraint.identity * parent_t.local_z()).rotation;
                 let iso = Isometry3d::new(translation + (main_t.local_y() * main_joint.length * 0.2), rot);
 
-                gizmos.arc_3d(constraint.x_max * 2.0, main_joint.length * 0.15, iso, settings.limits_color);
+                gizmos.arc_3d(constraint.x.y * 2.0, main_joint.length * 0.15, iso, settings.limits_color);
 
             
             }

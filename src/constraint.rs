@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-
+use crate::{RotationConstraint, utils::quat_abs};
 
 pub fn constrain_direction_cone(
     main_direction: Vec3,
@@ -54,3 +54,4 @@ pub fn constrain_direction_ellipse(
 
     main_direction.slerp(constrained.normalize(), strength).normalize()
 }
+

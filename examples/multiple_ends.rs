@@ -39,8 +39,7 @@ fn setup(
         length: joint_length,
         visual_offset: Vec3::Y * joint_length * 0.5,
         anchor_offset: Vec3::ZERO,
-    }
-        , RotationConstraint{
+    }, RotationConstraint{
             identity: Quat::IDENTITY,
             weight: 1.0,
             strength: 1.0,
@@ -94,7 +93,11 @@ fn setup(
     commands.spawn((
         Name::new("BaseJoint"),
         BaseJoint(base),
-        joint,
+        Joint{ // if the base joint has a Rotational Constraint component, it will be constrained to the base.
+            length: joint_length,
+            visual_offset: Vec3::Y * joint_length * 0.5,
+            anchor_offset: Vec3::ZERO,
+        },
         mesh.clone(),
         Transform::from_xyz(0.0, 0.0, 0.0),
         related!(JointChildren[(

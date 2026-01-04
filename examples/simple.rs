@@ -39,7 +39,6 @@ fn setup(
         Joint{
             length: joint_length,
             visual_offset: Vec3::Y * joint_length * 0.5,
-
             //the offset of the current base from the parent's end, obviously doesn't do anything to the bottom joint.
             anchor_offset: Vec3::ZERO,
         },
@@ -65,7 +64,6 @@ fn setup(
     //the Base, the entity that the root / base joint attatches itself to.
     let base = commands.spawn((
         Name::new("Base"),
-        Base::default(),
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
         MeshMaterial3d(materials.add(base_material)),
         Transform::from_xyz(0.0, 0.0, 0.0),
@@ -82,7 +80,6 @@ fn setup(
     //The End Effector, the entity that the chain points to.
     let end = commands.spawn((
         Name::new("End"),
-        EndEffector::default(),
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
         MeshMaterial3d(materials.add(end_material)),
         Transform::from_xyz(0.0, 1.0, 0.0),
@@ -102,7 +99,11 @@ fn setup(
     commands.spawn((
         Name::new("BaseJoint"),
         BaseJoint(base),
-        joint,
+        Joint{ //If we have a Rotational Constraint on the Base joint, it will constrain to be base rotation.
+            length: joint_length,
+            visual_offset: Vec3::Y * joint_length * 0.5,
+            anchor_offset: Vec3::ZERO,
+        },
         mesh.clone(),
         Transform::from_xyz(0.0, 0.0, 0.0),
         children![(
