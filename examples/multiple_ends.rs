@@ -1,3 +1,8 @@
+// This example shows both multiple joint chains and also multiple end
+// effectors in action together, just note that the extra end effector is
+// NOT like a pole target, at least with a normal weight. It freaks out
+// a little if you move the end effector in question to a place the chain
+// can't reach, or if the whole chain is tensioned.
 use bevy::{input::mouse::AccumulatedMouseScroll, prelude::*};
 use bevy_fabrik_solver::*;
 
@@ -9,6 +14,9 @@ fn main(){
         .run();
 }
 
+
+// we don't need to turn on the global transform setting, since the
+// standard bevy hierarchy is flat.
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -32,9 +40,6 @@ fn setup(
     let joint_length = 0.2;
 
     
-    // rotational constraints aren't perfect at the moment, particularly
-    // when an joint has multiple children, which is why i choose not to
-    // use it in this example.
     let joint = (Joint{
         length: joint_length,
         visual_offset: Vec3::Y * joint_length * 0.5,
@@ -76,15 +81,35 @@ fn setup(
         Name::new("End 1"),
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
         MeshMaterial3d(materials.add(end_material.clone())),
-        Transform::from_xyz(-0.25, 1.0, 0.0),
-        )).observe(translate_on_drag).observe(hover_scroll).id();
+        Transform::from_xyz(-0.25, 0.8, 0.0),
+    )).observe(translate_on_drag).observe(hover_scroll).id();
 
     let end2 = commands.spawn((
         Name::new("End 2"),
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
         MeshMaterial3d(materials.add(end_material.clone())),
-        Transform::from_xyz(0.25, 1.0, 0.0),
-        )).observe(translate_on_drag).observe(hover_scroll).id();
+        Transform::from_xyz(0.25, 0.9, 0.0),
+    )).observe(translate_on_drag).observe(hover_scroll).id();
+
+        
+    //A third end effector with a lower weight, for good measure
+    let end3 = commands.spawn((
+        Name::new("End 3"),
+        //slightly smaller sphere, to show it has less influence / is less important.
+        Mesh3d(meshes.add(Sphere::new(joint_length * 0.18))),
+        MeshMaterial3d(materials.add(end_material.clone())),
+        Transform::from_xyz(0.2, 0.6, 0.0),
+        EndEffector{
+            // on an end effector like this, if the weight is too high,
+            // it'll freak out. Too low and it'll be all floaty and weird.
+            // Also, you can add an end effector like this if you want
+            // to change the end effector settings.
+            weight: 0.1, 
+            ..Default::default()
+        }
+    )).observe(translate_on_drag).observe(hover_scroll).id();
+
+        
 
 // when doing it this way, the joints aren't acutally children of
 // eachother as far as bevy is concerned, they're only connected in the
@@ -133,12 +158,19 @@ fn setup(
                     joint,
                     mesh.clone(),
                     Transform::from_xyz(0.0, joint_length, 0.0),
+                    EEJoint(end3),
                     related!(JointChildren[(
                         Name::new("EndJoint"),
                         joint,
                         mesh.clone(),
                         Transform::from_xyz(0.0, joint_length, 0.0),
-                        EEJoint(end2),
+                        related!(JointChildren[(
+                            Name::new("EndJoint"),
+                            joint,
+                            mesh.clone(),
+                            Transform::from_xyz(0.0, joint_length, 0.0),
+                            EEJoint(end2),
+                        )])
                     )])
                 )])
             )])
@@ -147,6 +179,9 @@ fn setup(
 
 }
 
+
+
+//functions for translating the effectors
 
 fn translate_on_drag(
     drag: On<Pointer<Drag>>,

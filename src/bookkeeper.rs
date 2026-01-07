@@ -30,14 +30,17 @@ pub fn joint_hooks(
     //removes end effector from book, and removes the ee joint on the other end
     world.register_component_hooks::<EndEffector>()
         .on_add(|mut world, context|{
-            let joint = world.get::<EndEffector>(context.entity).unwrap().joint;
+            
+            let Some(joint) = world.get::<EndEffector>(context.entity).unwrap().joint else { return };
             world.commands().entity(joint).insert(EEJoint(context.entity));
         
         })
         .on_remove(
             |mut world, context|{
                 let (ee, _) = world.resource_mut::<JointBookkeeping>().ends.write().unwrap().remove(&context.entity).unwrap();
-                world.commands().entity(ee.joint).try_remove::<EEJoint>();
+                
+                let Some(joint) = ee.joint else { return };
+                world.commands().entity(joint).try_remove::<EEJoint>();
             }
         );
 
@@ -53,7 +56,7 @@ pub fn joint_hooks(
 
             world.commands().entity(effector).insert(
                 EndEffector{
-                    joint: context.entity,
+                    joint: Some(context.entity),
                     joint_center: j_c,
                     joint_copy_rotation: j_c_r,
                     weight: w,
@@ -128,6 +131,7 @@ pub fn bookkeep_joints_start(
     end_effectors_q: Query<(&EndEffector, &JointTransform, Entity)>,
     bases_q: Query<(&Base, &JointTransform, Entity)>,
     parent_setup: Query<(Entity, &ChildOf), Added<Joint>>,
+    joint_q: Query<&Joint>,
     mut commands: Commands,
 ){
     //Joints first, could make par iter
@@ -143,6 +147,8 @@ pub fn bookkeep_joints_start(
         joint_bookkeeper.bases.write().unwrap().insert(entity, (*base, *jt));
     }
     for (entity, parent) in parent_setup.iter(){
+        //makes sure the parent actually is a joint
+        let Ok(_) = joint_q.get(parent.0) else {continue};
         commands.entity(entity).try_insert_if_new(JointParent(parent.0));
     }
 

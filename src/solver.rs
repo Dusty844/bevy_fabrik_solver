@@ -123,6 +123,7 @@ fn forward_reach(
             let mut anchor_total = Vec3::ZERO;
             let mut rots = vec![];
             let mut weights = vec![];
+            let mut total_weight = 0.0;
 
             let (identity, strength) = if let Ok(constraint) = constraint_q.get(*main_entity) {
                 (constraint.identity.normalize(), constraint.strength)
@@ -156,7 +157,8 @@ fn forward_reach(
                 
                 rots.push(quat_abs(rot));
                 weights.push(ee.weight);
-                avg_top += possible_top_point;
+                avg_top += possible_top_point * ee.weight;
+                total_weight += ee.weight;
             }
             
             if let Ok((_, (parent_maybe, child_maybe))) = hierarchy_q.get(*main_entity) {
@@ -169,12 +171,21 @@ fn forward_reach(
                         let child_transform = bk.joints.lock().unwrap().get(child).unwrap().1;
                         let child_joint = bk.joints.lock().unwrap().get(child).unwrap().0;
                         let child_bottom_point = child_transform.translation - (child_transform.rotation * child_joint.visual_offset);
+                        let mut weight = 1.0;
+                        if let Ok(constraint) = constraint_q.get(*child){
+                            total_weight += constraint.weight;
+                            weight = constraint.weight;
+                        } else {
+                            total_weight += 1.0;
+                        }
 
-                        anchor_total += child_joint.anchor_offset;
-                        avg_top += child_bottom_point;
+                        anchor_total += child_joint.anchor_offset * weight;
+                        avg_top += child_bottom_point * weight;
+                        
+                        
                     }
 
-                    let pre_top = (avg_top + main_transform.rotation * anchor_total) / (ee_c + children_c) as f32;
+                    let pre_top = (avg_top + main_transform.rotation * anchor_total) / total_weight;
                     let up_dir = (pre_top - initial_bottom_point).normalize();
 
                     let local_up_dir = identity.inverse() * up_dir;
@@ -236,7 +247,7 @@ fn forward_reach(
 
             avg_top += anchor_total;
 
-            avg_top /= (ee_c + children_c) as f32;
+            avg_top /= total_weight;
 
             let new_bottom_point = avg_top - (final_rot * Vec3::Y * main_joint.length);
 
@@ -287,19 +298,26 @@ fn backward_reach(
                 let new_bottom_point = base_transform.translation;
                 let mut avg_top = Vec3::ZERO;
                 let mut anchor_total = Vec3::ZERO;
+                let mut total_weight = 0.0;
                 
                 for child in children.0.iter(){
                     let child_transform = bk.joints.lock().unwrap().get(child).unwrap().1;
                     let child_joint = bk.joints.lock().unwrap().get(child).unwrap().0;
                     let child_bottom_point = child_transform.translation - (child_transform.rotation * child_joint.visual_offset);
+                    let mut weight = 1.0;
+                    if let Ok(constraint) = constraint_q.get(*child) {
+                        
+                        weight = constraint.weight;
+                    }
+                    total_weight += weight;
 
-                    anchor_total += child_joint.anchor_offset;
-                    avg_top += child_bottom_point;
+                    anchor_total += child_joint.anchor_offset * weight;
+                    avg_top += child_bottom_point * weight;
                     current.push(*child);
                 }
 
                 let anchor_pos = new_bottom_point + (base_transform.rotation * main_joint.anchor_offset);
-                let pre_top = (avg_top + main_transform.rotation * anchor_total) / children.0.len() as f32;
+                let pre_top = (avg_top + main_transform.rotation * anchor_total) / total_weight;
                 let up_dir = (pre_top - anchor_pos).normalize();
 
                 let main_forward = main_transform.local_z().as_vec3();
@@ -452,4 +470,3 @@ fn backward_reach(
         
     *end_dists.lock().unwrap()
 }
-

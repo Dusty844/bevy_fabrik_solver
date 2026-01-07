@@ -104,7 +104,7 @@ impl JointTransform {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[require(Transform, JointTransform)]
 pub struct EndEffector{
-    pub joint: Entity,
+    pub joint: Option<Entity>,
     pub joint_center: bool,
     pub joint_copy_rotation: bool,
     pub weight: f32,
@@ -113,7 +113,7 @@ pub struct EndEffector{
 impl Default for EndEffector{
     fn default() -> Self {
         Self {
-            joint: Entity::PLACEHOLDER,
+            joint: None,
             joint_center: false,
             joint_copy_rotation: false,
             weight: 1.0

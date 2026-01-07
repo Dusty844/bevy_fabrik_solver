@@ -1,3 +1,24 @@
+// A minimal example of this crate / project. The basic idea of the solver
+// is that there are joints (could be bones on a character rig: knee,
+// thigh, arm, forearm, head etc.). These joints make up a chain of joints,
+// with the first one, the BaseJoint, is pinned to a Base (A seperate
+// entity, could be a root joint or spine joint). Each joint after is
+// attatched to the top of the last, and can be rotationally constrained
+// with the RotationalConstraint Component. The joint at the end known
+// as an EndJoint (sometimes other joints in the chain too) tries to
+// attatch itself to it's respective End Effector.
+
+// Joints can have multiple children (for example, two shoulder joints
+// and one neck joint). Each Joint can also point towards it's own End
+// Effector (one end effector per joint and vice versa).
+// Both End Effectors and Joints have a weight variable which adjusts
+// how much the target joint / parent joint points towards it, in terms
+// of both translational and rotational (only useful if a joint has more
+// then one thing to point at).
+
+// Includes some functions at the bottom to conveniently drag around the
+// effectors.
+
 use bevy::{input::mouse::AccumulatedMouseScroll, prelude::*};
 use bevy_fabrik_solver::*;
 
@@ -16,7 +37,7 @@ fn setup(
     mut ik_settings: ResMut<IkGlobalSettings>,
     
 ){
-    //since we have a standard (bevy Children and ChildOf), set this to true
+    //since we have a standard hierarchy (bevy Children and ChildOf), set this to true
     ik_settings.force_global_transform = true;
     
     commands.spawn((
@@ -83,6 +104,16 @@ fn setup(
         Mesh3d(meshes.add(Sphere::new(joint_length * 0.2))),
         MeshMaterial3d(materials.add(end_material)),
         Transform::from_xyz(0.0, 1.0, 0.0),
+
+        // Adding the End effector manually here, you don't need to do
+        // this because component hooks will do it for you. The values
+        // you see there are the default.
+        EndEffector{
+            joint_center: false,
+            joint_copy_rotation: false,
+            weight: 1.0,
+            joint: None,
+        }
     )).observe(translate_on_drag).observe(hover_scroll).id();
 
 // A joint chain does not need to use bevy's default transform hierarchy
@@ -126,7 +157,7 @@ fn setup(
                         joint,
                         mesh.clone(),
                         Transform::from_xyz(0.0, joint_length, 0.0),
-                        EEJoint(end),
+                        EEJoint(end), //this component is important
                     )]
                 )]
             )]
