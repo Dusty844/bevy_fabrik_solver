@@ -1,18 +1,25 @@
 # bevy_fabrik_solver
-An Inverse Kinematics Solver based on the FABRIK algorithm. Aims to be deeply integrated with bevy's ECS.
+An Inverse Kinematics Solver loosely based on the FABRIK algorithm. Aims to be deeply integrated with bevy's ECS.
+
+
+https://github.com/user-attachments/assets/f810a867-c0d0-404c-88bb-e98c762762a0
 
 
 ## General Features
 
-- Rotation constraints (somewhat limited at the moment, will revise at some point soon).
-
 - Uses Bevy's One-to-Many Relationships, allowing for multiple children joints.
 
+- Optional Rotational constraints (somewhat limited at the moment, will revise at some point soon).
+  
 - Multiple end effectors on one chain: One end effector per joint (if you so wish).
 
 - Automatic handling of joint relationships.
 
 - Rotational and Translational weighting of joints and end effectors (useful when there is more then one thing to point at).
+
+- Currently uses bevy 0.17, will probably update to 0.18 when it comes out.
+
+- Reflected Components via a reflect crate feature known as `bevy_reflect`
 
 - Also is an IK solver
 
@@ -26,7 +33,7 @@ First, Add `bevy_fabrik_solver` to your project, alongside `bevy`:
 # Cargo.toml
 [dependencies]
 bevy = "0.17.0"
-bevy_fabrik_solver = "0.1"
+bevy_fabrik_solver = { git = "https://github.com/Dusty844/bevy_fabrik_solver" }
 
 ```
 
@@ -119,7 +126,7 @@ fn setup(
 
 
 ```
-The Above Example Will result in something similar to this (see the [simple.rs](examples/simple.rs) example):
+The above example will result in something similar to this (see the [simple.rs](examples/simple.rs) example):
 
 https://github.com/user-attachments/assets/93d7c481-cce7-4176-9866-988f1899b91a
 
