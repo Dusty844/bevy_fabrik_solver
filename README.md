@@ -102,6 +102,21 @@ fn setup(
 
 
 ```
+The Above Example Will result in something similar to this (see the [simple.rs](examples/simple.rs) example):
+
+https://github.com/user-attachments/assets/93d7c481-cce7-4176-9866-988f1899b91a
+
+## General Features
+
+- Rotation constraints.
+
+- Chains with multiple end effectors.
+
+- Automatic handling of joint relationships.
+
+- Rotational weighting of joints and end effectors (useful when there is more then one thing to point at).
+
+- Also is an IK solver
 
 ## License
 
