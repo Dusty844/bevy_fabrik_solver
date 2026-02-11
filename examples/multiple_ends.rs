@@ -104,7 +104,7 @@ fn setup(
             // it'll freak out. Too low and it'll be all floaty and weird.
             // Also, you can add an end effector like this if you want
             // to change the end effector settings.
-            weight: 0.1, 
+            weight: 0.01, 
             ..Default::default()
         }
     )).observe(translate_on_drag).observe(hover_scroll).id();

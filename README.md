@@ -17,7 +17,7 @@ https://github.com/user-attachments/assets/f810a867-c0d0-404c-88bb-e98c762762a0
 
 - Rotational and Translational weighting of joints and end effectors (useful when there is more then one thing to point at).
 
-- Currently uses bevy 0.17, will probably update to 0.18 when it comes out.
+- Currently uses bevy 0.18.
 
 - Reflected Components via a reflect crate feature known as `bevy_reflect`
 
@@ -32,7 +32,7 @@ First, Add `bevy_fabrik_solver` to your project, alongside `bevy`:
 
 # Cargo.toml
 [dependencies]
-bevy = "0.17.0"
+bevy = "0.18"
 bevy_fabrik_solver = { git = "https://github.com/Dusty844/bevy_fabrik_solver" }
 
 ```
