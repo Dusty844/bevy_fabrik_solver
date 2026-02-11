@@ -2,8 +2,7 @@
 An Inverse Kinematics Solver loosely based on the FABRIK algorithm. Aims to be deeply integrated with bevy's ECS.
 
 
-https://github.com/user-attachments/assets/f810a867-c0d0-404c-88bb-e98c762762a0
-
+![example](misc/main_example.gif)
 
 ## General Features
 
@@ -124,7 +123,7 @@ fn setup(
 ```
 The above example will result in something similar to this (see the [simple.rs](examples/simple.rs) example):
 
-https://github.com/user-attachments/assets/93d7c481-cce7-4176-9866-988f1899b91a
+![example](misc/simple_example.gif)
 
 ## Version Table
 
