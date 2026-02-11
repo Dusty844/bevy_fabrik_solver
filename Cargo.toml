@@ -2,6 +2,13 @@
 name = "bevy_fabrik_solver"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["Dougall Sinclair <Dustyquark@gmail.com>"]
+description = "A Fabrik based IK Solver for the Bevy game engine"
+repository = "https://github.com/Dusty844/bevy_fabrik_solver"
+readme = "README.md"
+keywords = ["gamedev", "animation", "graphics", "bevy"]
+categories = ["game-development"]
 
 [dependencies]
 bevy = "0.18.0"

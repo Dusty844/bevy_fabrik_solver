@@ -21,10 +21,6 @@ https://github.com/user-attachments/assets/f810a867-c0d0-404c-88bb-e98c762762a0
 
 - Reflected Components via a reflect crate feature known as `bevy_reflect`
 
-- Also is an IK solver
-
-
-
 ## Usage
 
 First, Add `bevy_fabrik_solver` to your project, alongside `bevy`:
@@ -33,7 +29,7 @@ First, Add `bevy_fabrik_solver` to your project, alongside `bevy`:
 # Cargo.toml
 [dependencies]
 bevy = "0.18"
-bevy_fabrik_solver = { git = "https://github.com/Dusty844/bevy_fabrik_solver" }
+bevy_fabrik_solver = "0.1"
 
 ```
 
@@ -129,6 +125,13 @@ fn setup(
 The above example will result in something similar to this (see the [simple.rs](examples/simple.rs) example):
 
 https://github.com/user-attachments/assets/93d7c481-cce7-4176-9866-988f1899b91a
+
+## Version Table
+
+| Bevy    | 'bevy_fabrik_solver' |
+| ------- | -------------------- |
+| 0.18    | 0.1, main            |
+
 
 
 ## License
