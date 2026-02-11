@@ -1,4 +1,4 @@
-use bevy::{color::palettes::css::{BLUE, GREEN, GREY, LIGHT_GRAY, RED, WHITE}, prelude::*};
+use bevy::{color::palettes::css::{BLUE, GREEN, LIGHT_GRAY, RED, WHITE}, prelude::*};
 
 use crate::JointParent;
 

@@ -125,10 +125,10 @@ fn forward_reach(
             let mut weights = vec![];
             let mut total_weight = 0.0;
 
-            let (identity, strength) = if let Ok(constraint) = constraint_q.get(*main_entity) {
-                (constraint.identity.normalize(), constraint.strength)
+            let identity = if let Ok(constraint) = constraint_q.get(*main_entity) {
+                constraint.identity.normalize()
             } else {
-                (Quat::IDENTITY, 1.0)
+                Quat::IDENTITY
             };
 
             if let Ok((_, ee_joint)) = effector_joints.get(*main_entity) {

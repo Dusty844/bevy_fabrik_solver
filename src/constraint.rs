@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use crate::{RotationConstraint, utils::quat_abs};
 
 pub fn constrain_direction_cone(
     main_direction: Vec3,
